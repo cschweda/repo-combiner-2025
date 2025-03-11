@@ -9,11 +9,22 @@
   },
   "scripts": {
     "start": "node bin/cli.js",
-    "test": "node test/index.js",
-    "lint": "eslint 'src/**/*.js' 'bin/**/*.js' 'example/**/*.js'",
-    "format": "prettier --write 'src/**/*.js' 'bin/**/*.js' 'example/**/*.js'",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=jest.config.js",
+    "test:all": "node test/run-all-tests.js",
+    "test:node": "node test/node-tests.js",
+    "test:browser": "echo 'Open example/comprehensive-browser-tests.html in your browser to run browser tests'",
+    "lint": "eslint 'src/**/*.js' 'bin/**/*.js' 'example/**/*.js' 'test/**/*.js'",
+    "lint:fix": "eslint 'src/**/*.js' 'bin/**/*.js' 'example/**/*.js' 'test/**/*.js' --fix",
+    "format": "prettier --write 'src/**/*.js' 'bin/**/*.js' 'example/**/*.js' 'test/**/*.js'",
     "dev": "nodemon bin/cli.js",
-    "changelog:update": "node scripts/update-changelog.js"
+    "changelog:update": "node scripts/update-changelog.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=jest.config.js --watch",
+    "test:cli": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=jest.config.js test/cli.test.js",
+    "test:filename": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=jest.config.js test/filename-format.test.js",
+    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=jest.config.js test/integration.test.js",
+    "postinstall": "node scripts/ensure-directories.js",
+    "prepare": "node scripts/ensure-directories.js",
+    "ensure-dirs": "node scripts/ensure-directories.js"
   },
   "keywords": [
     "github",
@@ -31,7 +42,9 @@
   "devDependencies": {
     "eslint": "^8.57.0",
     "prettier": "^3.2.5",
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "jest": "^29.5.0",
+    "@jest/globals": "^29.5.0"
   },
   "engines": {
     "node": ">=18.0.0"

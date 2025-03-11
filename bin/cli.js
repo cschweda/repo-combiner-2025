@@ -12,6 +12,9 @@ import readline from 'readline';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Determine project root directory (one level up from bin directory)
+const projectRoot = path.resolve(__dirname, '..');
+
 // Load environment variables from .env file
 dotenv.config();
 
@@ -112,9 +115,63 @@ async function promptForFormat(defaultFormat) {
 }
 
 /**
+ * Format a datetime string for filenames (YYYY-MM-DD_HH-MM-SS)
+ * @returns {string} Formatted datetime string
+ */
+function getFormattedDateTime() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+}
+
+/**
+ * Add datetime to a filename
+ * @param {string} filename - Base filename
+ * @returns {string} Filename with datetime
+ */
+function addDateTimeToFilename(filename) {
+  const dateTime = getFormattedDateTime();
+  const ext = path.extname(filename);
+  const base = path.basename(filename, ext);
+  const dir = path.dirname(filename);
+  return path.join(dir, `${base}_${dateTime}${ext}`);
+}
+
+/**
+ * Ensure required directories exist
+ */
+async function ensureDirectoriesExist() {
+  // Define the directories that should exist
+  const requiredDirs = [
+    path.join(projectRoot, 'output'),
+    path.join(projectRoot, 'bin', 'output')
+  ];
+  
+  // Create each directory if it doesn't exist
+  for (const dir of requiredDirs) {
+    try {
+      await fs.mkdir(dir, { recursive: true });
+    } catch (err) {
+      // Ignore errors if directory already exists
+      if (err.code !== 'EEXIST') {
+        console.warn(`Warning: Could not create directory ${dir}: ${err.message}`);
+      }
+    }
+  }
+}
+
+/**
  * Command-line interface
  */
 async function cli() {
+  // Ensure output directories exist before starting
+  await ensureDirectoriesExist();
+  
   const argv = minimist(process.argv.slice(2), {
     string: ['format', 'output', 'token', 'username', 'password'],
     boolean: ['help', 'version', 'keep-temp'],
@@ -130,7 +187,7 @@ async function cli() {
     },
     default: {
       format: 'text',
-      output: path.join(process.cwd(), 'output', 'output.txt'),
+      output: path.join(projectRoot, 'output', 'output'), // Using just base name without extension
       'keep-temp': false,
       token: process.env.GITHUB_TOKEN || '',
       username: process.env.GITHUB_USERNAME || '',
@@ -184,9 +241,7 @@ async function cli() {
   }
 
   // Validate repository URL
-  if (
-    !repoUrl.match(/^(https?:\/\/|git@)([a-zA-Z0-9-]+\.)+[a-zA-Z0-9]{2,}(\/|:)[^\s]+\/[^\s]+$/)
-  ) {
+  if (!repoUrl.match(/^(https?:\/\/|git@)([a-zA-Z0-9-]+\.)+[a-zA-Z0-9]{2,}(\/|:)[^\s]+\/[^\s]+$/)) {
     console.error('Error: Invalid repository URL format');
     console.error(
       'Expected format: https://github.com/username/repository or git@github.com:username/repository'
@@ -219,8 +274,16 @@ async function cli() {
 
     // Always write output to file
     if (argv.output) {
-      // Suggest appropriate file extension if missing
+      // Check if the output path is absolute, if not make it relative to project root
       let outputPath = argv.output;
+      if (!path.isAbsolute(outputPath)) {
+        outputPath = path.join(projectRoot, outputPath);
+      }
+
+      // Normalize path separators for cross-platform compatibility
+      outputPath = path.normalize(outputPath);
+
+      // Suggest appropriate file extension if missing
       const hasExtension = path.extname(outputPath) !== '';
 
       if (!hasExtension) {
@@ -229,11 +292,17 @@ async function cli() {
         console.log(`No extension specified, using ${outputPath}`);
       }
 
+      // Add datetime to the filename
+      outputPath = addDateTimeToFilename(outputPath);
+      console.log(`Adding datetime to filename: ${outputPath}`);
+
       // Ensure output directory exists
       const outputDir = path.dirname(outputPath);
-      await fs.mkdir(outputDir, { recursive: true }).catch(err => {
+      try {
+        await fs.mkdir(outputDir, { recursive: true });
+      } catch (err) {
         if (err.code !== 'EEXIST') throw err;
-      });
+      }
 
       await fs.writeFile(
         outputPath,
