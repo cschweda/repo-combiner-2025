@@ -601,7 +601,35 @@ npm test
 
 ## Publishing
 
-Follow these steps when publishing a new version to npm:
+### Automated Publishing
+
+This package includes a streamlined release process using the automated release script:
+
+```bash
+# Login to npm first
+npm login
+
+# For a patch release (bug fixes)
+npm run release
+
+# For a minor release (new features, backwards compatible)
+npm run release:minor
+
+# For a major release (breaking changes)
+npm run release:major
+```
+
+The automated release script will:
+1. Run linting and tests to ensure code quality
+2. Update the changelog with recent commits
+3. Bump the version according to semantic versioning
+4. Create a git tag for the new version
+5. Push changes and tags to GitHub
+6. Publish the package to npm
+
+### Manual Publishing Steps
+
+If you prefer to publish manually, follow these steps:
 
 ### 1. Pre-publishing Checks
 
