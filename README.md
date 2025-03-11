@@ -25,24 +25,28 @@ Repo Combiner is especially valuable for machine learning and AI applications th
 ### Practical Examples
 
 1. **Code Review Assistant**:
+
    ```
    repo-combiner https://github.com/user/project --format markdown
    # Feed the output to an LLM with the prompt: "Review this codebase for security issues"
    ```
 
 2. **Migration Planning**:
+
    ```
    repo-combiner https://github.com/user/legacy-app --format json
    # Ask an LLM: "Design a step-by-step migration plan from this AngularJS app to React"
    ```
 
 3. **Dependency Analysis**:
+
    ```
    repo-combiner https://github.com/user/project --format text
    # Prompt an LLM: "Analyze the dependencies and suggest optimizations"
    ```
 
 4. **Technical Documentation Generation**:
+
    ```
    repo-combiner https://github.com/user/project --format markdown
    # Instruct an LLM: "Generate comprehensive technical documentation for this codebase"
@@ -57,8 +61,9 @@ Repo Combiner is especially valuable for machine learning and AI applications th
 ### Token Counting Benefits
 
 The built-in token counting feature allows you to:
+
 - Estimate costs before sending to an LLM API
-- Ensure the content fits within your model's context window 
+- Ensure the content fits within your model's context window
 - Track usage metrics for large-scale processing
 
 ## Features
@@ -128,11 +133,13 @@ npm link
 #### Platform-Specific Notes
 
 **Windows**:
+
 - If you encounter permission issues, run your terminal as administrator
 - Use PowerShell or Windows Terminal for best experience
 - Make sure Git is in your PATH
 
 **Linux**:
+
 - Depending on your distribution, you may need to use `sudo` for global installation:
   ```bash
   sudo npm install -g repo-combiner
@@ -140,6 +147,7 @@ npm link
 - Ensure you have proper write permissions to your output directory
 
 **macOS**:
+
 - If you're using Homebrew to manage Node.js, you should not need `sudo` for global installation
 - You may need to use `sudo` if you installed Node.js differently:
   ```bash
@@ -358,6 +366,7 @@ You can run this example by:
 #### Platform-Specific Notes for Web Examples
 
 **Windows**:
+
 - If you have issues with `npx serve`, you can also use Python's built-in HTTP server:
   ```
   python -m http.server 3000
@@ -365,6 +374,7 @@ You can run this example by:
 - Some browsers might block local file access. Use a web server like described above.
 
 **Linux/macOS**:
+
 - You can also use Python's HTTP server as an alternative:
   ```
   python3 -m http.server 3000
@@ -483,8 +493,6 @@ import React from 'react';
 ```
 ````
 
-````
-
 ### JSON Format
 
 ```json
@@ -502,7 +510,7 @@ import React from 'react';
         "modified": "2023-06-15T14:32:10Z"
       },
       "content": "// File content here"
-    },
+    }
     // More files...
   ],
   "stats": {
@@ -513,7 +521,7 @@ import React from 'react';
     "tokenCount": 52480
   }
 }
-````
+```
 
 ## Token Count Information
 
@@ -527,6 +535,28 @@ At the end of each successful run, the tool will display:
 ```
 
 This information helps you track usage metrics and understand the complexity of the repository.
+
+## Line Count Information
+
+At the end of each successful run, the tool will display detailed statistics including line counts:
+
+```
+✅ Repository processing complete!
+📊 Stats: 45 files processed (250KB)
+📝 Total lines: 3,245
+🔢 Total tokens: 52,480
+⏱️ Processing time: 1.2 seconds
+```
+
+This information helps you track usage metrics and understand the complexity of the repository.
+
+You can also run the line counting tool separately on your codebase:
+
+```bash
+npm run count-lines
+```
+
+This will generate a report of all files in your project with their line counts, and save a markdown summary to `code-stats.md`.
 
 ## Project Structure
 
@@ -702,12 +732,14 @@ MIT
 #### Code Analysis and Improvement
 
 - **Automated Code Reviews**: Feed an entire codebase to get comprehensive reviews that understand cross-file relationships
+
   ```bash
   repo-combiner https://github.com/user/project --format markdown > project.md
   # Prompt: "Review this codebase for performance bottlenecks, security issues, and best practice violations"
   ```
 
 - **Technical Debt Assessment**: Identify and prioritize technical debt across the entire project
+
   ```bash
   repo-combiner https://github.com/user/legacy-project --format json > project.json
   # Prompt: "Analyze this codebase for technical debt and provide a prioritized refactoring plan"
@@ -722,6 +754,7 @@ MIT
 #### Documentation and Knowledge Transfer
 
 - **Automated Documentation Generation**: Create comprehensive documentation that understands full project context
+
   ```bash
   repo-combiner https://github.com/user/project --format markdown > project.md
   # Prompt: "Generate detailed user and developer documentation for this project"
@@ -736,6 +769,7 @@ MIT
 #### Migration and Modernization
 
 - **Framework Migration Planning**: Generate detailed migration plans between frameworks
+
   ```bash
   repo-combiner https://github.com/user/legacy-app --format json > app.json
   # Prompt: "Create a step-by-step plan to migrate this Angular.js application to React"
@@ -769,6 +803,7 @@ The built-in token counter helps you:
 - **Track Processing Metrics**: Monitor token usage across projects for budgeting and resource allocation
 
 At the end of each run, you'll see useful token metrics:
+
 ```
 Repository processing completed:
 - Total files processed: 152
@@ -790,10 +825,3 @@ Examples:
 - `react-app_2023-08-15_14-32-45.md`
 - `tensorflow_2023-08-16_09-15-22.json`
 - `express-server_2023-08-17_18-05-37.txt`
-
-This naming convention ensures that:
-
-1. Files are sortable chronologically
-2. Filenames are both machine-parsable and human-readable
-3. Each export creates a unique file
-4. The repository name can be included in the base filename

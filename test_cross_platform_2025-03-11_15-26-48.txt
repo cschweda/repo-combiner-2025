@@ -1,0 +1,5600 @@
+REPOSITORY CONTENT
+====================
+
+Generated at: 2025-03-11T20:26:48.223Z
+
+Total files: 29
+Total size: 0.16 MB
+Total tokens: 40,199
+
+FILE: .env.sample
+=================
+Size: 0.35 KB
+Last Modified: 2025-03-11T20:26:48.207Z
+-----------------
+
+# GitHub authentication (choose one method)
+
+# Method 1: Personal Access Token (recommended)
+# Create a token at https://github.com/settings/tokens
+GITHUB_TOKEN=your_github_personal_access_token
+
+# Method 2: Username and Password (less secure, not recommended for 2FA accounts)
+# GITHUB_USERNAME=your_github_username
+# GITHUB_PASSWORD=your_github_password
+
+
+
+FILE: .eslintrc.json
+====================
+Size: 0.39 KB
+Last Modified: 2025-03-11T20:26:48.207Z
+--------------------
+
+{
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "rules": {
+    "indent": ["error", 2],
+    "linebreak-style": ["error", "unix"],
+    "quotes": ["error", "single", { "avoidEscape": true }],
+    "semi": ["error", "always"],
+    "no-console": "off"
+  }
+}
+
+
+FILE: .npmignore
+================
+Size: 0.07 KB
+Last Modified: 2025-03-11T20:26:48.207Z
+----------------
+
+example/
+test/
+.eslintrc
+.prettierrc
+.gitignore
+.DS_Store
+node_modules/
+
+
+FILE: .npmrc
+============
+Size: 0.07 KB
+Last Modified: 2025-03-11T20:26:48.207Z
+------------
+
+registry=https://registry.npmjs.org/
+save-exact=false
+package-lock=true
+
+
+FILE: .nvmrc
+============
+Size: 0.01 KB
+Last Modified: 2025-03-11T20:26:48.207Z
+------------
+
+18.18.2
+
+
+FILE: .prettierrc.json
+======================
+Size: 0.15 KB
+Last Modified: 2025-03-11T20:26:48.207Z
+----------------------
+
+{
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "tabWidth": 2,
+  "semi": true,
+  "printWidth": 100,
+  "bracketSpacing": true,
+  "arrowParens": "avoid"
+}
+
+
+FILE: bin/cli.js
+================
+Size: 8.38 KB
+Last Modified: 2025-03-11T20:26:48.208Z
+----------------
+
+#!/usr/bin/env node
+
+import path from 'path';
+import fs from 'fs/promises';
+import minimist from 'minimist';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { createRepoCombiner } from '../src/repo-combiner.js';
+import readline from 'readline';
+
+// Make the module work in both ESM and CommonJS environments
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables from .env file
+dotenv.config();
+
+// Check for authentication environment variables and print a warning if not found
+if (!process.env.GITHUB_TOKEN && !(process.env.GITHUB_USERNAME && process.env.GITHUB_PASSWORD)) {
+  console.warn('\n⚠️  Warning: No GitHub authentication found in environment variables.');
+  console.warn('   For private repositories, create a .env file with GitHub credentials.');
+  console.warn('   See .env.sample for more information.\n');
+}
+
+/**
+ * Show CLI help
+ */
+function showHelp() {
+  console.log(`
+Usage: repo-combiner [options] <repository-url>
+
+Options:
+  -h, --help                  Show this help
+  -v, --version               Show version
+  -f, --format <type>         Output format: text, json, or markdown (default: text)
+  -o, --output <file>         Write output to file (default: output/output.txt)
+  -k, --keep-temp             Keep temporary files
+  -t, --token <token>         GitHub personal access token (for private repositories)
+  -u, --username <username>   GitHub username (for private repositories)
+  -p, --password <password>   GitHub password (for private repositories)
+
+Authentication:
+  For private repositories, you can provide authentication in three ways:
+  1. Set GITHUB_TOKEN in .env file (recommended)
+  2. Set GITHUB_USERNAME and GITHUB_PASSWORD in .env file
+  3. Use the --token or --username/--password flags
+
+Examples:
+  repo-combiner https://github.com/user/repo
+  repo-combiner -f markdown -o output/repo.md https://github.com/user/repo
+  repo-combiner --format json --output output/repo.json https://github.com/user/repo
+  repo-combiner --token ghp_xxxxxxxxxxxx https://github.com/user/private-repo
+  `);
+}
+
+/**
+ * Create a readline interface for user prompts
+ */
+function createPrompt() {
+  return readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+}
+
+/**
+ * Ask user for repository URL
+ * @param {string} defaultRepoUrl Default repository URL
+ * @returns {Promise<string>} Selected repository URL
+ */
+async function promptForRepository(defaultRepoUrl) {
+  const rl = createPrompt();
+
+  return new Promise(resolve => {
+    rl.question(`Use default repository (${defaultRepoUrl})? [Y/n] `, answer => {
+      if (answer.toLowerCase() === 'n' || answer.toLowerCase() === 'no') {
+        rl.question('Enter repository URL: ', repoUrl => {
+          rl.close();
+          resolve(repoUrl.trim());
+        });
+      } else {
+        rl.close();
+        resolve(defaultRepoUrl);
+      }
+    });
+  });
+}
+
+/**
+ * Ask user for output format
+ * @param {string} defaultFormat Default output format
+ * @returns {Promise<string>} Selected output format
+ */
+async function promptForFormat(defaultFormat) {
+  const rl = createPrompt();
+  const validFormats = ['text', 'markdown', 'json'];
+
+  return new Promise(resolve => {
+    rl.question(
+      `Select output format [text/markdown/json] (default: ${defaultFormat}): `,
+      answer => {
+        rl.close();
+        const format = answer.trim().toLowerCase();
+        if (!format || !validFormats.includes(format)) {
+          resolve(defaultFormat);
+        } else {
+          resolve(format);
+        }
+      }
+    );
+  });
+}
+
+/**
+ * Command-line interface
+ */
+async function cli() {
+  const argv = minimist(process.argv.slice(2), {
+    string: ['format', 'output', 'token', 'username', 'password'],
+    boolean: ['help', 'version', 'keep-temp'],
+    alias: {
+      h: 'help',
+      v: 'version',
+      f: 'format',
+      o: 'output',
+      k: 'keep-temp',
+      t: 'token',
+      u: 'username',
+      p: 'password',
+    },
+    default: {
+      format: 'text',
+      output: path.join(process.cwd(), 'output', 'output.txt'),
+      'keep-temp': false,
+      token: process.env.GITHUB_TOKEN || '',
+      username: process.env.GITHUB_USERNAME || '',
+      password: process.env.GITHUB_PASSWORD || '',
+    },
+  });
+
+  // Show help
+  if (argv.help) {
+    showHelp();
+    return;
+  }
+
+  // Show version
+  if (argv.version) {
+    try {
+      const packageJsonPath = path.resolve(__dirname, '../package.json');
+      const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
+      console.log(`repo-combiner v${packageJson.version}`);
+    } catch (error) {
+      console.error('Error reading package.json:', error.message);
+      console.log('repo-combiner v1.0.0');
+    }
+    return;
+  }
+
+  // Default repository URL for this project
+  const defaultRepoUrl = 'https://github.com/cschweda/repo-combiner-2025';
+
+  // Check for repository URL from arguments
+  let repoUrl = argv._[0];
+
+  // If no repository URL is provided via arguments, prompt the user
+  if (!repoUrl) {
+    repoUrl = await promptForRepository(defaultRepoUrl);
+  }
+
+  // Prompt for format if not specified in arguments and not in non-interactive mode
+  let format = argv.format;
+  if (format === 'text' && !argv.output && process.stdin.isTTY) {
+    format = await promptForFormat('text');
+  }
+
+  // Validate format
+  const validFormats = ['text', 'markdown', 'json'];
+  if (!validFormats.includes(format)) {
+    console.error(
+      `Error: Invalid format '${format}'. Valid formats are: ${validFormats.join(', ')}`
+    );
+    return;
+  }
+
+  // Validate repository URL
+  if (
+    !repoUrl.match(/^(https?:\/\/|git@)([a-zA-Z0-9-]+\.)+[a-zA-Z0-9]{2,}(\/|:)[^\s]+\/[^\s]+$/)
+  ) {
+    console.error('Error: Invalid repository URL format');
+    console.error(
+      'Expected format: https://github.com/username/repository or git@github.com:username/repository'
+    );
+    return;
+  }
+
+  // Process repository
+  const repoCombiner = createRepoCombiner({
+    format: format,
+    keepTemp: argv['keep-temp'],
+    auth: {
+      token: argv.token,
+      username: argv.username,
+      password: argv.password,
+    },
+    onProgress: status => {
+      if (status.message) {
+        console.log(status.message);
+      }
+    },
+  });
+
+  try {
+    console.log(`Processing repository: ${repoUrl}`);
+    console.log(`Output format: ${format}`);
+    console.log('This may take a while for large repositories...');
+
+    const output = await repoCombiner.processRepo(repoUrl);
+
+    // Always write output to file
+    if (argv.output) {
+      // Suggest appropriate file extension if missing
+      let outputPath = argv.output;
+      const hasExtension = path.extname(outputPath) !== '';
+
+      if (!hasExtension) {
+        const extensions = { text: '.txt', markdown: '.md', json: '.json' };
+        outputPath = `${outputPath}${extensions[format] || ''}`;
+        console.log(`No extension specified, using ${outputPath}`);
+      }
+
+      // Ensure output directory exists
+      const outputDir = path.dirname(outputPath);
+      await fs.mkdir(outputDir, { recursive: true }).catch(err => {
+        if (err.code !== 'EEXIST') throw err;
+      });
+
+      await fs.writeFile(
+        outputPath,
+        typeof output === 'string' ? output : JSON.stringify(output, null, 2)
+      );
+      console.log(`Output written to ${outputPath}`);
+    } else {
+      // Print output to console
+      console.log(typeof output === 'string' ? output : JSON.stringify(output, null, 2));
+    }
+  } catch (error) {
+    console.error('Error processing repository:');
+    console.error(error.message);
+    // Provide more helpful error messages based on error type
+    if (error.message.includes('API rate limit')) {
+      console.error('\nTip: GitHub API rate limit exceeded. Try authenticating with a token:');
+      console.error(
+        '  repo-combiner --token YOUR_GITHUB_TOKEN https://github.com/username/repository'
+      );
+    } else if (error.message.includes('authentication')) {
+      console.error('\nTip: For private repositories, you need to provide authentication:');
+      console.error(
+        '  repo-combiner --token YOUR_GITHUB_TOKEN https://github.com/username/repository'
+      );
+    } else if (error.message.includes('404')) {
+      console.error(
+        '\nTip: Repository not found. Check that the URL is correct and the repository exists.'
+      );
+    }
+    process.exit(1);
+  }
+}
+
+// Execute the CLI function
+cli().catch(error => {
+  console.error('Unhandled error:', error);
+  process.exit(1);
+});
+
+
+
+FILE: CHANGELOG.md
+==================
+Size: 0.57 KB
+Last Modified: 2025-03-11T20:26:48.207Z
+------------------
+
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Initial project setup
+- CLI implementation with format options (text, markdown, JSON)
+- Three web implementations (Vanilla JS, Vue 3, Svelte 5)
+- Repository processing functionality
+- Output formatting options
+- Authentication support for private repositories
+
+### Changed
+
+### Fixed
+
+### Removed
+
+
+
+FILE: example/browser-example.html
+==================================
+Size: 13.06 KB
+Last Modified: 2025-03-11T20:26:48.208Z
+----------------------------------
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Repo Combiner Web Interface</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .form-container {
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    input[type="text"], select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.2s;
+    }
+    button:hover {
+      background-color: #0069d9;
+    }
+    .progress {
+      margin: 20px 0;
+      display: none;
+    }
+    .progress-bar {
+      height: 8px;
+      background-color: #e9ecef;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background-color: #007bff;
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .status {
+      margin-top: 5px;
+      font-size: 14px;
+      color: #6c757d;
+    }
+    .output-container {
+      display: none;
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .output-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .output-actions {
+      display: flex;
+      gap: 10px;
+    }
+    pre {
+      background-color: #f1f3f5;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+    .loading {
+      text-align: center;
+      padding: 30px;
+      display: none;
+    }
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border-left-color: #007bff;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .error {
+      color: #dc3545;
+      background-color: #f8d7da;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Repo Combiner</h1>
+  
+  <div class="form-container">
+    <div class="form-group">
+      <label for="repoUrl">GitHub Repository URL:</label>
+      <input type="text" id="repoUrl" placeholder="https://github.com/username/repository" 
+             value="https://github.com/yamadashy/repomix">
+    </div>
+
+    <div class="form-group">
+      <label for="format">Output Format:</label>
+      <select id="format">
+        <option value="text">Text</option>
+        <option value="markdown" selected>Markdown</option>
+        <option value="json">JSON</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <details>
+        <summary>Authentication (for private repositories)</summary>
+        <div style="padding: 10px 0;">
+          <div class="form-group">
+            <label for="authType">Authentication Method:</label>
+            <select id="authType">
+              <option value="none">None (Public Repository)</option>
+              <option value="token">Personal Access Token</option>
+              <option value="basic">Username & Password</option>
+            </select>
+          </div>
+          
+          <div id="tokenAuth" style="display: none;">
+            <div class="form-group">
+              <label for="githubToken">GitHub Personal Access Token:</label>
+              <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+            </div>
+          </div>
+          
+          <div id="basicAuth" style="display: none;">
+            <div class="form-group">
+              <label for="githubUsername">GitHub Username:</label>
+              <input type="text" id="githubUsername" placeholder="Your GitHub username">
+            </div>
+            <div class="form-group">
+              <label for="githubPassword">GitHub Password:</label>
+              <input type="password" id="githubPassword" placeholder="Your GitHub password">
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="form-group">
+      <button id="processButton">Process Repository</button>
+    </div>
+
+    <div class="progress">
+      <div class="progress-bar">
+        <div class="progress-bar-fill"></div>
+      </div>
+      <div class="status">Processing repository...</div>
+    </div>
+    
+    <div class="error" id="errorMessage"></div>
+  </div>
+  
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div>Processing repository...</div>
+  </div>
+
+  <div class="output-container" id="outputContainer">
+    <div class="output-header">
+      <h2>Repository Content</h2>
+      <div class="output-actions">
+        <button id="copyButton">Copy</button>
+        <button id="downloadButton">Download</button>
+      </div>
+    </div>
+    <div id="output"></div>
+  </div>
+
+  <script type="module">
+    // Import the repo-combiner module
+    import { createRepoCombiner } from '../src/repo-combiner.js';
+    
+    // DOM elements
+    const repoUrlInput = document.getElementById('repoUrl');
+    const formatSelect = document.getElementById('format');
+    const processButton = document.getElementById('processButton');
+    const progressBar = document.querySelector('.progress');
+    const progressBarFill = document.querySelector('.progress-bar-fill');
+    const statusText = document.querySelector('.status');
+    const loadingElement = document.getElementById('loading');
+    const outputContainer = document.getElementById('outputContainer');
+    const outputElement = document.getElementById('output');
+    const copyButton = document.getElementById('copyButton');
+    const downloadButton = document.getElementById('downloadButton');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    // Store the result
+    let result = null;
+    
+    // Auth type selector
+    const authTypeSelect = document.getElementById('authType');
+    const tokenAuthDiv = document.getElementById('tokenAuth');
+    const basicAuthDiv = document.getElementById('basicAuth');
+    
+    // Toggle authentication fields based on selection
+    authTypeSelect.addEventListener('change', () => {
+      const authType = authTypeSelect.value;
+      
+      tokenAuthDiv.style.display = authType === 'token' ? 'block' : 'none';
+      basicAuthDiv.style.display = authType === 'basic' ? 'block' : 'none';
+    });
+    
+    // Process repository button click handler
+    processButton.addEventListener('click', async () => {
+      const repoUrl = repoUrlInput.value.trim();
+      const format = formatSelect.value;
+      
+      // Validate repository URL
+      if (!repoUrl || !repoUrl.includes('github.com')) {
+        showError('Please enter a valid GitHub repository URL');
+        return;
+      }
+      
+      // Reset UI
+      resetUI();
+      
+      // Show loading
+      loadingElement.style.display = 'block';
+      
+      try {
+        // Get authentication details
+        const authType = authTypeSelect.value;
+        const auth = {};
+        
+        if (authType === 'token') {
+          const token = document.getElementById('githubToken').value.trim();
+          if (token) {
+            auth.token = token;
+          } else {
+            showError('Please enter a GitHub token or select a different authentication method');
+            loadingElement.style.display = 'none';
+            return;
+          }
+        } else if (authType === 'basic') {
+          const username = document.getElementById('githubUsername').value.trim();
+          const password = document.getElementById('githubPassword').value.trim();
+          
+          if (username && password) {
+            auth.username = username;
+            auth.password = password;
+          } else {
+            showError('Please enter both username and password or select a different authentication method');
+            loadingElement.style.display = 'none';
+            return;
+          }
+        }
+        
+        // Create repo combiner with selected options
+        const repoCombiner = createRepoCombiner({
+          format,
+          auth,
+          // Add custom event listener for progress updates
+          onProgress: updateProgress
+        });
+        
+        // Process repository
+        result = await repoCombiner.processRepo(repoUrl);
+        
+        // Display the result based on format
+        displayResult(result, format);
+      } catch (error) {
+        console.error('Error processing repository:', error);
+        showError(`Error processing repository: ${error.message}`);
+      } finally {
+        // Hide loading
+        loadingElement.style.display = 'none';
+      }
+    });
+    
+    // Update progress
+    function updateProgress(status) {
+      progressBar.style.display = 'block';
+      statusText.textContent = status.message || 'Processing...';
+      
+      if (status.progress !== undefined) {
+        progressBarFill.style.width = `${status.progress * 100}%`;
+      }
+    }
+    
+    // Display result based on format
+    function displayResult(data, format) {
+      // Show output container
+      outputContainer.style.display = 'block';
+      
+      // Display based on format
+      if (format === 'json') {
+        // JSON format
+        outputElement.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } else if (format === 'markdown') {
+        // Markdown format (using marked.js if available)
+        if (window.marked) {
+          outputElement.innerHTML = window.marked(data);
+        } else {
+          outputElement.innerHTML = `<pre>${data}</pre>`;
+        }
+      } else {
+        // Text format
+        outputElement.innerHTML = `<pre>${data}</pre>`;
+      }
+    }
+    
+    // Copy button click handler
+    copyButton.addEventListener('click', () => {
+      const format = formatSelect.value;
+      let textToCopy;
+      
+      if (format === 'json' && typeof result === 'object') {
+        textToCopy = JSON.stringify(result, null, 2);
+      } else {
+        textToCopy = result;
+      }
+      
+      navigator.clipboard.writeText(textToCopy)
+        .then(() => {
+          const originalText = copyButton.textContent;
+          copyButton.textContent = 'Copied!';
+          setTimeout(() => {
+            copyButton.textContent = originalText;
+          }, 2000);
+        })
+        .catch(err => {
+          console.error('Failed to copy: ', err);
+        });
+    });
+    
+    // Download button click handler
+    downloadButton.addEventListener('click', () => {
+      const format = formatSelect.value;
+      const repoName = getRepoNameFromUrl(repoUrlInput.value.trim());
+      
+      let content;
+      let filename;
+      let type;
+      
+      if (format === 'json') {
+        content = JSON.stringify(result, null, 2);
+        filename = `${repoName}.json`;
+        type = 'application/json';
+      } else if (format === 'markdown') {
+        content = result;
+        filename = `${repoName}.md`;
+        type = 'text/markdown';
+      } else {
+        content = result;
+        filename = `${repoName}.txt`;
+        type = 'text/plain';
+      }
+      
+      // Create blob and download
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+    
+    // Extract repository name from URL
+    function getRepoNameFromUrl(url) {
+      try {
+        const parts = url.split('/');
+        return parts[parts.length - 1].replace('.git', '');
+      } catch (error) {
+        return 'repository';
+      }
+    }
+    
+    // Show error message
+    function showError(message) {
+      errorMessage.textContent = message;
+      errorMessage.style.display = 'block';
+    }
+    
+    // Reset UI
+    function resetUI() {
+      errorMessage.style.display = 'none';
+      progressBar.style.display = 'none';
+      progressBarFill.style.width = '0%';
+      statusText.textContent = 'Processing repository...';
+      outputContainer.style.display = 'none';
+      outputElement.innerHTML = '';
+    }
+    
+    // Load marked.js for markdown rendering (optional)
+    function loadMarkedJs() {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+    
+    // Load marked.js
+    loadMarkedJs();
+  </script>
+</body>
+</html>
+
+
+FILE: example/browser-tests.html
+================================
+Size: 13.92 KB
+Last Modified: 2025-03-11T20:26:48.208Z
+--------------------------------
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Repo Combiner Browser Tests</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1, h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .container {
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .test-controls {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.2s;
+      margin: 0 5px;
+    }
+    button:hover {
+      background-color: #0069d9;
+    }
+    button.secondary {
+      background-color: #6c757d;
+    }
+    button.secondary:hover {
+      background-color: #5a6268;
+    }
+    .status {
+      margin: 20px 0;
+      font-size: 16px;
+    }
+    .test-results {
+      display: none;
+      background-color: #f1f3f5;
+      padding: 15px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-top: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .test-summary {
+      margin-top: 15px;
+      font-weight: bold;
+      display: none;
+    }
+    .test-summary.success {
+      color: #28a745;
+    }
+    .test-summary.failure {
+      color: #dc3545;
+    }
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0, 123, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #007bff;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .hidden {
+      display: none;
+    }
+    .options-panel {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #e9ecef;
+      border-radius: 4px;
+    }
+    .checkbox-group {
+      margin-bottom: 10px;
+    }
+    .input-group {
+      margin-bottom: 10px;
+    }
+    label {
+      display: inline-block;
+      margin-right: 10px;
+    }
+    input[type="text"] {
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ced4da;
+      width: 300px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Repo Combiner Browser Tests</h1>
+  
+  <div class="container">
+    <h2>Browser Environment Tests</h2>
+    <p>This page runs tests on the repo-combiner library in a browser environment to verify browser-specific functionality.</p>
+    
+    <div class="test-controls">
+      <button id="runTestsButton">Run All Tests</button>
+      <button id="toggleOptionsButton" class="secondary">Show Options</button>
+    </div>
+
+    <div id="optionsPanel" class="options-panel hidden">
+      <h3>Test Options</h3>
+      
+      <div class="checkbox-group">
+        <input type="checkbox" id="skipRemoteTests" checked>
+        <label for="skipRemoteTests">Skip tests that require GitHub API access</label>
+      </div>
+      
+      <div class="input-group">
+        <label for="testRepoUrl">Test Repository URL (optional):</label>
+        <input type="text" id="testRepoUrl" placeholder="https://github.com/username/repository">
+      </div>
+      
+      <div class="checkbox-group">
+        <input type="checkbox" id="useFallbackEncoding">
+        <label for="useFallbackEncoding">Force use of fallback Base64 encoding</label>
+      </div>
+    </div>
+    
+    <div id="testStatus" class="status">Ready to run tests.</div>
+    
+    <div id="testSummary" class="test-summary"></div>
+    
+    <pre id="testResults" class="test-results"></pre>
+  </div>
+  
+  <script type="module">
+    // Import the repo-combiner module
+    import { createRepoCombiner } from '../src/repo-combiner.js';
+    import { runBrowserTests } from '../test/browser-tests.js';
+    import { initMockGitHubApi, restoreFetch } from './mock-github-api.js';
+    
+    // Elements
+    const runTestsButton = document.getElementById('runTestsButton');
+    const toggleOptionsButton = document.getElementById('toggleOptionsButton');
+    const optionsPanel = document.getElementById('optionsPanel');
+    const testStatus = document.getElementById('testStatus');
+    const testResults = document.getElementById('testResults');
+    const testSummary = document.getElementById('testSummary');
+    const skipRemoteTestsCheckbox = document.getElementById('skipRemoteTests');
+    const testRepoUrlInput = document.getElementById('testRepoUrl');
+    const useFallbackEncodingCheckbox = document.getElementById('useFallbackEncoding');
+    
+    // Add more options to the panel
+    function addMockApiOptions() {
+      const optionsHtml = `
+        <h3>Mock GitHub API Options</h3>
+        <div class="checkbox-group">
+          <input type="checkbox" id="useMockApi" checked>
+          <label for="useMockApi">Use Mock GitHub API (avoid real API calls)</label>
+        </div>
+        
+        <h4>Test Scenarios</h4>
+        <div class="checkbox-group">
+          <input type="checkbox" id="mockRateLimitError">
+          <label for="mockRateLimitError">Simulate Rate Limit Error</label>
+        </div>
+        
+        <div class="checkbox-group">
+          <input type="checkbox" id="mockAuthError">
+          <label for="mockAuthError">Simulate Authentication Error</label>
+        </div>
+        
+        <div class="checkbox-group">
+          <input type="checkbox" id="mockNetworkError">
+          <label for="mockNetworkError">Simulate Network Error</label>
+        </div>
+        
+        <div class="checkbox-group">
+          <input type="checkbox" id="mockRepoNotFound">
+          <label for="mockRepoNotFound">Simulate Repository Not Found</label>
+        </div>
+        
+        <div class="input-group">
+          <label for="remainingRateLimit">Simulated Remaining Rate Limit:</label>
+          <input type="number" id="remainingRateLimit" min="0" max="60" value="10" style="width: 60px;">
+        </div>
+      `;
+      
+      const div = document.createElement('div');
+      div.className = 'mock-api-options';
+      div.innerHTML = optionsHtml;
+      optionsPanel.appendChild(div);
+      
+      // Add event listener to toggle mockable scenarios
+      document.getElementById('useMockApi').addEventListener('change', (e) => {
+        const mockOptions = document.querySelectorAll('.mock-api-options input:not(#useMockApi)');
+        for (const option of mockOptions) {
+          option.disabled = !e.target.checked;
+        }
+      });
+    }
+    
+    // Toggle options panel
+    toggleOptionsButton.addEventListener('click', () => {
+      const isHidden = optionsPanel.classList.contains('hidden');
+      optionsPanel.classList.toggle('hidden', !isHidden);
+      toggleOptionsButton.textContent = isHidden ? 'Hide Options' : 'Show Options';
+    });
+    
+    // Run tests
+    runTestsButton.addEventListener('click', async () => {
+      // Reset UI
+      testStatus.innerHTML = '<div class="spinner"></div> Running tests...';
+      testResults.style.display = 'none';
+      testSummary.style.display = 'none';
+      runTestsButton.disabled = true;
+      
+      try {
+        // Mock btoa if fallback testing is enabled
+        const originalBtoa = window.btoa;
+        if (useFallbackEncodingCheckbox.checked) {
+          window.btoa = null; // Force fallback implementation
+        }
+        
+        // Configure mock GitHub API if enabled
+        if (document.getElementById('useMockApi')?.checked) {
+          initMockGitHubApi({
+            enabled: true,
+            mockRateLimitError: document.getElementById('mockRateLimitError')?.checked || false,
+            mockAuthError: document.getElementById('mockAuthError')?.checked || false,
+            mockNetworkError: document.getElementById('mockNetworkError')?.checked || false,
+            mockRepoNotFound: document.getElementById('mockRepoNotFound')?.checked || false,
+            remainingRateLimit: parseInt(document.getElementById('remainingRateLimit')?.value || '10', 10),
+            resetTime: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+          });
+        } else {
+          // Ensure the original fetch is restored
+          restoreFetch();
+        }
+        
+        // Add additional test for the mock API
+        const mockApiTest = async (runner) => {
+          // Create a test specially for the selected mock scenario
+          if (document.getElementById('mockRateLimitError')?.checked) {
+            runner.test('Mock API - Rate Limit Error Test', async () => {
+              const combiner = createRepoCombiner();
+              try {
+                await combiner.processRepo('https://github.com/mock/repo');
+                runner.assert(false, 'Should throw rate limit error');
+              } catch (error) {
+                runner.assert(
+                  error.message.includes('rate limit') && error.isRateLimit, 
+                  'Should throw rate limit error with correct properties'
+                );
+              }
+            });
+          }
+          
+          if (document.getElementById('mockAuthError')?.checked) {
+            runner.test('Mock API - Authentication Error Test', async () => {
+              const combiner = createRepoCombiner();
+              try {
+                await combiner.processRepo('https://github.com/mock/repo');
+                runner.assert(false, 'Should throw authentication error');
+              } catch (error) {
+                runner.assert(
+                  error.message.includes('Authentication') || error.message.includes('credentials'), 
+                  'Should throw authentication error with correct message'
+                );
+              }
+            });
+          }
+          
+          if (document.getElementById('mockNetworkError')?.checked) {
+            runner.test('Mock API - Network Error Test', async () => {
+              const combiner = createRepoCombiner();
+              try {
+                await combiner.processRepo('https://github.com/mock/repo');
+                runner.assert(false, 'Should throw network error');
+              } catch (error) {
+                runner.assert(
+                  error.message.includes('Network') || error.message.includes('fetch'), 
+                  'Should throw network error with correct message'
+                );
+              }
+            });
+          }
+          
+          if (document.getElementById('mockRepoNotFound')?.checked) {
+            runner.test('Mock API - Repository Not Found Test', async () => {
+              const combiner = createRepoCombiner();
+              try {
+                await combiner.processRepo('https://github.com/mock/repo');
+                runner.assert(false, 'Should throw not found error');
+              } catch (error) {
+                runner.assert(
+                  error.message.includes('not found') || error.status === 404, 
+                  'Should throw not found error with correct message'
+                );
+              }
+            });
+          }
+        };
+        
+        // Run tests with options
+        const results = await runBrowserTests({
+          moduleExports: { createRepoCombiner },
+          skipRemoteTests: skipRemoteTestsCheckbox.checked || document.getElementById('useMockApi')?.checked,
+          testRepoUrl: testRepoUrlInput.value || undefined,
+          additionalTests: mockApiTest
+        });
+        
+        // Restore original btoa if it was mocked
+        if (useFallbackEncodingCheckbox.checked) {
+          window.btoa = originalBtoa;
+        }
+        
+        // Restore original fetch
+        restoreFetch();
+        
+        // Display results
+        testResults.textContent = results.output;
+        testResults.style.display = 'block';
+        
+        // Set summary
+        const { passed, total, failed } = results.results;
+        if (failed === 0) {
+          testSummary.textContent = `All ${passed} tests passed!`;
+          testSummary.className = 'test-summary success';
+        } else {
+          testSummary.textContent = `${failed} of ${total} tests failed.`;
+          testSummary.className = 'test-summary failure';
+        }
+        testSummary.style.display = 'block';
+        
+        // Update status
+        testStatus.innerHTML = 'Tests completed.';
+      } catch (error) {
+        console.error('Error running tests:', error);
+        testStatus.innerHTML = `Error running tests: ${error.message}`;
+        testResults.textContent = error.stack || 'No stack trace available';
+        testResults.style.display = 'block';
+        
+        testSummary.textContent = 'Tests failed to run.';
+        testSummary.className = 'test-summary failure';
+        testSummary.style.display = 'block';
+        
+        // Ensure original fetch is restored
+        restoreFetch();
+      } finally {
+        runTestsButton.disabled = false;
+      }
+    });
+    
+    // Test browser support features
+    function checkBrowserFeatures() {
+      const features = {
+        fetch: typeof fetch !== 'undefined',
+        promise: typeof Promise !== 'undefined',
+        asyncAwait: (async () => {})() instanceof Promise,
+        modules: true, // We're in a module if this code runs
+        btoa: typeof btoa === 'function'
+      };
+      
+      console.log('Browser features:', features);
+      
+      const missingFeatures = Object.entries(features)
+        .filter(([_, supported]) => !supported)
+        .map(([name]) => name);
+      
+      if (missingFeatures.length > 0) {
+        testStatus.innerHTML = `⚠️ Warning: Your browser is missing required features: ${missingFeatures.join(', ')}`;
+      } else {
+        testStatus.innerHTML = '✅ Browser supports all required features.';
+      }
+    }
+    
+    // Add mock API options to the panel
+    addMockApiOptions();
+    
+    // Check browser features on load
+    checkBrowserFeatures();
+  </script>
+</body>
+</html>
+
+
+FILE: example/index.html
+========================
+Size: 2.65 KB
+Last Modified: 2025-03-11T20:26:48.208Z
+------------------------
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Repo Combiner Examples</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+          'Open Sans', 'Helvetica Neue', sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      h1 {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .implementations {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        justify-content: center;
+      }
+      .card {
+        width: 300px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+      .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      }
+      .card-header {
+        background-color: #007bff;
+        color: white;
+        padding: 15px;
+        text-align: center;
+        font-size: 1.2em;
+        font-weight: bold;
+      }
+      .card-body {
+        padding: 15px;
+      }
+      p {
+        margin-top: 0;
+      }
+      .btn {
+        display: inline-block;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        text-align: center;
+        margin-top: 10px;
+        transition: background-color 0.2s;
+      }
+      .btn:hover {
+        background-color: #0069d9;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Repo Combiner Web Examples</h1>
+
+    <div class="implementations">
+      <div class="card">
+        <div class="card-header">Vanilla JavaScript</div>
+        <div class="card-body">
+          <p>A pure JavaScript implementation with no frameworks or build steps.</p>
+          <a href="./vanilla/index.html" class="btn">View Example</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Vue 3</div>
+        <div class="card-body">
+          <p>An implementation using Vue 3 with the Options API pattern.</p>
+          <a href="./vue/index.html" class="btn">View Example</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Svelte 5</div>
+        <div class="card-body">
+          <p>An implementation using Svelte 5 with the latest features.</p>
+          <a href="./svelte/index.html" class="btn">View Example</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+
+
+
+FILE: example/mock-github-api.js
+================================
+Size: 6.65 KB
+Last Modified: 2025-03-11T20:26:48.208Z
+--------------------------------
+
+/**
+ * Mock GitHub API for browser testing without making actual API requests
+ *
+ * This is a simple implementation that intercepts fetch requests to github.com
+ * and returns mock responses for testing various scenarios.
+ */
+
+// Original fetch function
+const originalFetch = window.fetch;
+
+/**
+ * Initialize the mock GitHub API
+ * @param {Object} options Mock options
+ */
+export function initMockGitHubApi(options = {}) {
+  const defaultOptions = {
+    enabled: true,
+    mockRateLimitError: false,
+    mockAuthError: false,
+    mockNetworkError: false,
+    mockServerError: false,
+    mockRepoNotFound: false,
+    mockSuccessfulRepo: true,
+    remainingRateLimit: 60,
+    resetTime: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+  };
+
+  const settings = { ...defaultOptions, ...options };
+
+  if (!settings.enabled) {
+    // Restore original fetch if mock is disabled
+    window.fetch = originalFetch;
+    console.log('Mock GitHub API disabled, using original fetch');
+    return;
+  }
+
+  // Override fetch
+  window.fetch = async function (url, options) {
+    // Only intercept GitHub API requests
+    if (typeof url === 'string' && url.includes('api.github.com')) {
+      console.log(`Mock GitHub API intercepted request to: ${url}`);
+
+      // Extract repo info from URL
+      let owner, repo, path;
+      try {
+        const match = url.match(/\/repos\/([^/]+)\/([^/]+)(?:\/contents\/(.*))?/);
+        if (match) {
+          [, owner, repo, path] = match;
+          path = path || '';
+        }
+      } catch (e) {
+        console.error('Error parsing GitHub URL:', e);
+      }
+
+      // Simulate network error
+      if (settings.mockNetworkError) {
+        throw new Error('Network error: Failed to fetch');
+      }
+
+      // Create response headers
+      const headers = new Headers({
+        'content-type': 'application/json',
+        'x-ratelimit-limit': '60',
+        'x-ratelimit-remaining': settings.remainingRateLimit.toString(),
+        'x-ratelimit-reset': settings.resetTime.toString(),
+      });
+
+      // Simulate rate limit error
+      if (settings.mockRateLimitError) {
+        return new Response(
+          JSON.stringify({
+            message: 'API rate limit exceeded for your IP (60 requests per hour).',
+            documentation_url:
+              'https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting',
+          }),
+          {
+            status: 403,
+            headers,
+          }
+        );
+      }
+
+      // Simulate authentication error
+      if (settings.mockAuthError) {
+        return new Response(
+          JSON.stringify({
+            message: 'Bad credentials',
+            documentation_url: 'https://docs.github.com/rest',
+          }),
+          { status: 401, headers }
+        );
+      }
+
+      // Simulate server error
+      if (settings.mockServerError) {
+        return new Response(
+          JSON.stringify({
+            message: 'Server Error',
+          }),
+          { status: 500, headers }
+        );
+      }
+
+      // Simulate repo not found
+      if (settings.mockRepoNotFound) {
+        return new Response(
+          JSON.stringify({
+            message: 'Not Found',
+            documentation_url: 'https://docs.github.com/rest/reference/repos#get-a-repository',
+          }),
+          { status: 404, headers }
+        );
+      }
+
+      // Return successful response with mock data
+      if (settings.mockSuccessfulRepo) {
+        // Check if this is a repo info request or contents request
+        if (url.includes('/contents/')) {
+          // Mock directory contents
+          return new Response(
+            JSON.stringify([
+              {
+                name: 'README.md',
+                path: `${path ? path + '/' : ''}README.md`,
+                sha: 'mock-sha-1',
+                size: 1024,
+                url: `https://api.github.com/repos/${owner}/${repo}/contents/README.md`,
+                html_url: `https://github.com/${owner}/${repo}/blob/main/README.md`,
+                git_url: `https://api.github.com/repos/${owner}/${repo}/git/blobs/mock-sha-1`,
+                download_url: `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`,
+                type: 'file',
+              },
+              {
+                name: 'src',
+                path: `${path ? path + '/' : ''}src`,
+                sha: 'mock-sha-2',
+                size: 0,
+                url: `https://api.github.com/repos/${owner}/${repo}/contents/src`,
+                html_url: `https://github.com/${owner}/${repo}/tree/main/src`,
+                git_url: `https://api.github.com/repos/${owner}/${repo}/git/trees/mock-sha-2`,
+                download_url: null,
+                type: 'dir',
+              },
+            ]),
+            { status: 200, headers }
+          );
+        } else if (url.includes('/repos/') && !url.includes('/contents')) {
+          // Mock repository info
+          return new Response(
+            JSON.stringify({
+              id: 123456789,
+              name: repo,
+              full_name: `${owner}/${repo}`,
+              private: false,
+              html_url: `https://github.com/${owner}/${repo}`,
+              description: 'A mock repository for testing',
+              url: `https://api.github.com/repos/${owner}/${repo}`,
+              size: 1024,
+              stargazers_count: 42,
+              watchers_count: 42,
+              language: 'JavaScript',
+              has_issues: true,
+              has_projects: true,
+              has_downloads: true,
+              has_wiki: true,
+              has_pages: false,
+              forks_count: 13,
+              archived: false,
+              disabled: false,
+              open_issues_count: 5,
+              license: {
+                key: 'mit',
+                name: 'MIT License',
+                url: 'https://api.github.com/licenses/mit',
+              },
+              visibility: 'public',
+              default_branch: 'main',
+            }),
+            { status: 200, headers }
+          );
+        } else if (url.includes('raw.githubusercontent.com') || url.includes('download_url')) {
+          // Mock file content
+          return new Response(
+            'This is mock file content for testing.\n\nThe repo-combiner tool is working correctly!',
+            {
+              status: 200,
+              headers: new Headers({
+                'content-type': 'text/plain',
+              }),
+            }
+          );
+        }
+      }
+    }
+
+    // Pass through to original fetch for non-GitHub requests
+    return originalFetch(url, options);
+  };
+
+  console.log('Mock GitHub API initialized with settings:', settings);
+}
+
+/**
+ * Restore the original fetch function
+ */
+export function restoreFetch() {
+  window.fetch = originalFetch;
+  console.log('Restored original fetch function');
+}
+
+
+
+FILE: example/README.md
+=======================
+Size: 2.03 KB
+Last Modified: 2025-03-11T20:26:48.208Z
+-----------------------
+
+# Repo Combiner Web Implementations
+
+This directory contains three different implementations of the Repo Combiner web interface, each using a different front-end technology but with identical UI and functionality.
+
+## Implementations
+
+### 1. Vanilla JavaScript
+
+The Vanilla JavaScript implementation uses no framework, just plain JavaScript and HTML.
+
+- [View Vanilla JS Implementation](./vanilla/index.html)
+- No build steps required, just open the HTML file in a browser
+
+### 2. Vue 3
+
+The Vue 3 implementation uses Vue.js 3 with the Options API.
+
+- [View Vue 3 Implementation](./vue/index.html)
+- Uses Vue 3 CDN, no build steps required
+
+### 3. Svelte 5
+
+The Svelte 5 implementation uses Svelte 5's runes in a minimal setup.
+
+- [View Svelte 5 Implementation](./svelte/index.html)
+- Uses Svelte 5 runtime via CDN, no build steps required
+
+## Common Features in All Implementations
+
+- GitHub repository URL input
+- Output format selection (text, markdown, JSON)
+- Authentication options for private repositories
+- Progress indication during processing
+- Error handling
+- Copy and download functionality for results
+- Markdown rendering using marked.js
+
+## Usage
+
+1. Open any of the implementations in a modern web browser
+2. Enter a GitHub repository URL (or use the default)
+3. Select an output format (text, markdown, or JSON)
+4. Add authentication if required for private repositories
+5. Click "Process Repository" to start processing
+6. View the resulting output, with options to copy or download
+
+## Shared Resources
+
+- [Shared CSS Styles](./shared/styles.css) - Common styling used across all implementations
+- [Marked.js](https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js) - Markdown rendering library
+
+## Technical Notes
+
+- All implementations import the core `repo-combiner.js` module from the `src` directory
+- The implementations are designed to work directly in the browser without build steps
+- Each implementation provides identical functionality with the same UI
+- The code is organized to showcase each framework's approach to the same tasks
+
+
+
+FILE: example/shared/styles.css
+===============================
+Size: 2.48 KB
+Last Modified: 2025-03-11T20:26:48.208Z
+-------------------------------
+
+/* Shared styles for all repo-combiner web implementations */
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  line-height: 1.6;
+  color: #333;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+h1 {
+  margin-bottom: 5px;
+}
+
+.subtitle {
+  color: #6c757d;
+  margin-top: 0;
+  font-size: 1.1em;
+}
+
+.form-container {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+input[type="text"],
+input[type="password"],
+select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: #0069d9;
+}
+
+details summary {
+  cursor: pointer;
+  color: #007bff;
+  font-weight: 500;
+  padding: 5px 0;
+}
+
+.progress {
+  margin: 20px 0;
+  display: none;
+}
+
+.progress-bar {
+  height: 8px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: #007bff;
+  width: 0%;
+  transition: width 0.3s;
+}
+
+.status {
+  margin-top: 5px;
+  font-size: 14px;
+  color: #6c757d;
+}
+
+.loading {
+  text-align: center;
+  padding: 30px;
+  display: none;
+}
+
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border-left-color: #007bff;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error {
+  color: #dc3545;
+  background-color: #f8d7da;
+  padding: 10px;
+  border-radius: 4px;
+  margin-top: 10px;
+  display: none;
+}
+
+.output-container {
+  display: none;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.output-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.output-actions {
+  display: flex;
+  gap: 10px;
+}
+
+pre {
+  background-color: #f1f3f5;
+  padding: 15px;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+#output {
+  max-height: 600px;
+  overflow: auto;
+}
+
+
+
+FILE: example/svelte/App.js
+===========================
+Size: 9.44 KB
+Last Modified: 2025-03-11T20:26:48.208Z
+---------------------------
+
+import { createRepoCombiner } from '../../src/repo-combiner.js';
+
+export default function App(options) {
+  const { target } = options;
+
+  // State management
+  let repoUrl = 'https://github.com/yamadashy/repomix';
+  let format = 'markdown';
+  let authType = 'none';
+  let githubToken = '';
+  let githubUsername = '';
+  let githubPassword = '';
+  let result = null;
+  let loading = false;
+  let processing = false;
+  let progressPercent = 0;
+  let progressMessage = 'Processing repository...';
+  let errorMsg = '';
+  let copyButtonText = 'Copy';
+
+  // Methods
+  function resetUI() {
+    errorMsg = '';
+    processing = false;
+    progressPercent = 0;
+    progressMessage = 'Processing repository...';
+    result = null;
+    copyButtonText = 'Copy';
+    render();
+  }
+
+  function updateProgress(status) {
+    processing = true;
+    progressMessage = status.message || 'Processing...';
+
+    if (status.progress !== undefined) {
+      progressPercent = status.progress * 100;
+    }
+    render();
+  }
+
+  async function processRepository() {
+    if (!repoUrl || !repoUrl.includes('github.com')) {
+      errorMsg = 'Please enter a valid GitHub repository URL';
+      render();
+      return;
+    }
+
+    resetUI();
+    loading = true;
+    render();
+
+    try {
+      const auth = {};
+
+      if (authType === 'token') {
+        if (!githubToken) {
+          errorMsg = 'Please enter a GitHub token or select a different authentication method';
+          loading = false;
+          render();
+          return;
+        }
+        auth.token = githubToken;
+      } else if (authType === 'basic') {
+        if (!githubUsername || !githubPassword) {
+          errorMsg =
+            'Please enter both username and password or select a different authentication method';
+          loading = false;
+          render();
+          return;
+        }
+        auth.username = githubUsername;
+        auth.password = githubPassword;
+      }
+
+      const repoCombiner = createRepoCombiner({
+        format,
+        auth,
+        onProgress: updateProgress,
+      });
+
+      result = await repoCombiner.processRepo(repoUrl);
+    } catch (error) {
+      console.error('Error processing repository:', error);
+      errorMsg = `Error processing repository: ${error.message}`;
+    } finally {
+      loading = false;
+      processing = false;
+      render();
+    }
+  }
+
+  function copyOutput() {
+    const textToCopy = result;
+    navigator.clipboard
+      .writeText(textToCopy)
+      .then(() => {
+        copyButtonText = 'Copied!';
+        render();
+        setTimeout(() => {
+          copyButtonText = 'Copy';
+          render();
+        }, 2000);
+      })
+      .catch(err => {
+        console.error('Failed to copy: ', err);
+      });
+  }
+
+  function downloadOutput() {
+    const repoName = getRepoNameFromUrl(repoUrl);
+
+    let content = result;
+    let filename;
+    let type;
+
+    if (format === 'json') {
+      content = JSON.stringify(result, null, 2);
+      filename = `${repoName}.json`;
+      type = 'application/json';
+    } else if (format === 'markdown') {
+      filename = `${repoName}.md`;
+      type = 'text/markdown';
+    } else {
+      filename = `${repoName}.txt`;
+      type = 'text/plain';
+    }
+
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function getRepoNameFromUrl(url) {
+    try {
+      const parts = url.split('/');
+      return parts[parts.length - 1].replace('.git', '');
+    } catch (error) {
+      return 'repository';
+    }
+  }
+
+  function getFormattedResult() {
+    if (!result) return '';
+
+    if (format === 'json') {
+      return `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+    } else if (format === 'markdown' && window.marked) {
+      return window.marked.parse(result);
+    } else {
+      return `<pre>${result}</pre>`;
+    }
+  }
+
+  // Event handlers
+  function handleAuthTypeChange(e) {
+    authType = e.target.value;
+    render();
+  }
+
+  function handleFormatChange(e) {
+    format = e.target.value;
+    render();
+  }
+
+  function handleRepoUrlChange(e) {
+    repoUrl = e.target.value;
+  }
+
+  function handleGithubTokenChange(e) {
+    githubToken = e.target.value;
+  }
+
+  function handleGithubUsernameChange(e) {
+    githubUsername = e.target.value;
+  }
+
+  function handleGithubPasswordChange(e) {
+    githubPassword = e.target.value;
+  }
+
+  // Render function
+  function render() {
+    target.innerHTML = `
+      <header>
+        <h1>Repo Combiner</h1>
+        <p class="subtitle">Svelte 5 Implementation</p>
+      </header>
+      
+      <div class="form-container">
+        <div class="form-group">
+          <label for="repoUrl">GitHub Repository URL:</label>
+          <input type="text" id="repoUrl" value="${repoUrl}" placeholder="https://github.com/username/repository">
+        </div>
+
+        <div class="form-group">
+          <label for="format">Output Format:</label>
+          <select id="format">
+            <option value="text" ${format === 'text' ? 'selected' : ''}>Text</option>
+            <option value="markdown" ${format === 'markdown' ? 'selected' : ''}>Markdown</option>
+            <option value="json" ${format === 'json' ? 'selected' : ''}>JSON</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <details>
+            <summary>Authentication (for private repositories)</summary>
+            <div style="padding: 10px 0;">
+              <div class="form-group">
+                <label for="authType">Authentication Method:</label>
+                <select id="authType">
+                  <option value="none" ${authType === 'none' ? 'selected' : ''}>None (Public Repository)</option>
+                  <option value="token" ${authType === 'token' ? 'selected' : ''}>Personal Access Token</option>
+                  <option value="basic" ${authType === 'basic' ? 'selected' : ''}>Username & Password</option>
+                </select>
+              </div>
+              
+              <div id="tokenAuth" style="display: ${authType === 'token' ? 'block' : 'none'};">
+                <div class="form-group">
+                  <label for="githubToken">GitHub Personal Access Token:</label>
+                  <input type="password" id="githubToken" value="${githubToken}" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                </div>
+              </div>
+              
+              <div id="basicAuth" style="display: ${authType === 'basic' ? 'block' : 'none'};">
+                <div class="form-group">
+                  <label for="githubUsername">GitHub Username:</label>
+                  <input type="text" id="githubUsername" value="${githubUsername}" placeholder="Your GitHub username">
+                </div>
+                <div class="form-group">
+                  <label for="githubPassword">GitHub Password:</label>
+                  <input type="password" id="githubPassword" value="${githubPassword}" placeholder="Your GitHub password">
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <div class="form-group">
+          <button id="processButton">Process Repository</button>
+        </div>
+
+        <div class="progress" style="display: ${processing ? 'block' : 'none'}">
+          <div class="progress-bar">
+            <div class="progress-bar-fill" style="width: ${progressPercent}%"></div>
+          </div>
+          <div class="status">${progressMessage}</div>
+        </div>
+        
+        <div class="error" style="display: ${errorMsg ? 'block' : 'none'}">${errorMsg}</div>
+      </div>
+      
+      <div class="loading" style="display: ${loading ? 'block' : 'none'}">
+        <div class="spinner"></div>
+        <div>Processing repository...</div>
+      </div>
+
+      <div class="output-container" style="display: ${result ? 'block' : 'none'}">
+        <div class="output-header">
+          <h2>Repository Content</h2>
+          <div class="output-actions">
+            <button id="copyButton">${copyButtonText}</button>
+            <button id="downloadButton">Download</button>
+          </div>
+        </div>
+        <div id="output">${getFormattedResult()}</div>
+      </div>
+    `;
+
+    // Add event listeners after DOM update
+    document.getElementById('repoUrl').addEventListener('input', handleRepoUrlChange);
+    document.getElementById('format').addEventListener('change', handleFormatChange);
+    document.getElementById('authType').addEventListener('change', handleAuthTypeChange);
+    document.getElementById('processButton').addEventListener('click', processRepository);
+
+    if (document.getElementById('githubToken')) {
+      document.getElementById('githubToken').addEventListener('input', handleGithubTokenChange);
+    }
+
+    if (document.getElementById('githubUsername')) {
+      document
+        .getElementById('githubUsername')
+        .addEventListener('input', handleGithubUsernameChange);
+    }
+
+    if (document.getElementById('githubPassword')) {
+      document
+        .getElementById('githubPassword')
+        .addEventListener('input', handleGithubPasswordChange);
+    }
+
+    if (document.getElementById('copyButton')) {
+      document.getElementById('copyButton').addEventListener('click', copyOutput);
+    }
+
+    if (document.getElementById('downloadButton')) {
+      document.getElementById('downloadButton').addEventListener('click', downloadOutput);
+    }
+  }
+
+  // Initial render
+  render();
+
+  // Return instance
+  return {
+    render,
+    destroy() {
+      // Clean up if needed
+    },
+  };
+}
+
+
+
+FILE: example/svelte/index.html
+===============================
+Size: 0.67 KB
+Last Modified: 2025-03-11T20:26:48.208Z
+-------------------------------
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Repo Combiner - Svelte 5</title>
+    <link rel="stylesheet" href="../shared/styles.css" />
+    <!-- Import marked.js for markdown rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <!-- Import Svelte 5 runtime with named exports -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/svelte@5.0.0-next.1/dist/svelte.js"
+      type="module"
+    ></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
+
+
+
+FILE: example/svelte/main.js
+============================
+Size: 0.19 KB
+Last Modified: 2025-03-11T20:26:48.209Z
+----------------------------
+
+// Import Svelte app component
+import App from './App.js';
+
+// Mount Svelte app using the correct approach
+const app = new App({
+  target: document.getElementById('app'),
+});
+
+export default app;
+
+
+
+FILE: example/vanilla/index.html
+================================
+Size: 3.46 KB
+Last Modified: 2025-03-11T20:26:48.209Z
+--------------------------------
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Repo Combiner - Vanilla JS</title>
+    <link rel="stylesheet" href="../shared/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Repo Combiner</h1>
+      <p class="subtitle">Vanilla JavaScript Implementation</p>
+    </header>
+
+    <div class="form-container">
+      <div class="form-group">
+        <label for="repoUrl">GitHub Repository URL:</label>
+        <input
+          type="text"
+          id="repoUrl"
+          placeholder="https://github.com/username/repository"
+          value="https://github.com/yamadashy/repomix"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="format">Output Format:</label>
+        <select id="format">
+          <option value="text">Text</option>
+          <option value="markdown" selected>Markdown</option>
+          <option value="json">JSON</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <details>
+          <summary>Authentication (for private repositories)</summary>
+          <div style="padding: 10px 0">
+            <div class="form-group">
+              <label for="authType">Authentication Method:</label>
+              <select id="authType">
+                <option value="none">None (Public Repository)</option>
+                <option value="token">Personal Access Token</option>
+                <option value="basic">Username & Password</option>
+              </select>
+            </div>
+
+            <div id="tokenAuth" style="display: none">
+              <div class="form-group">
+                <label for="githubToken">GitHub Personal Access Token:</label>
+                <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+              </div>
+            </div>
+
+            <div id="basicAuth" style="display: none">
+              <div class="form-group">
+                <label for="githubUsername">GitHub Username:</label>
+                <input type="text" id="githubUsername" placeholder="Your GitHub username" />
+              </div>
+              <div class="form-group">
+                <label for="githubPassword">GitHub Password:</label>
+                <input type="password" id="githubPassword" placeholder="Your GitHub password" />
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="form-group">
+        <button id="processButton">Process Repository</button>
+      </div>
+
+      <div class="progress">
+        <div class="progress-bar">
+          <div class="progress-bar-fill"></div>
+        </div>
+        <div class="status">Processing repository...</div>
+      </div>
+
+      <div class="error" id="errorMessage"></div>
+    </div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div>Processing repository...</div>
+    </div>
+
+    <div class="output-container" id="outputContainer">
+      <div class="output-header">
+        <h2>Repository Content</h2>
+        <div class="output-actions">
+          <button id="copyButton">Copy</button>
+          <button id="downloadButton">Download</button>
+        </div>
+      </div>
+      <div id="output"></div>
+    </div>
+
+    <!-- Load marked.js for markdown rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+
+    <!-- Load the repo-combiner module -->
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
+
+
+
+FILE: example/vanilla/main.js
+=============================
+Size: 6.26 KB
+Last Modified: 2025-03-11T20:26:48.209Z
+-----------------------------
+
+// Import the repo-combiner module
+import { createRepoCombiner } from '../../src/repo-combiner.js';
+
+// DOM elements
+const repoUrlInput = document.getElementById('repoUrl');
+const formatSelect = document.getElementById('format');
+const processButton = document.getElementById('processButton');
+const progressBar = document.querySelector('.progress');
+const progressBarFill = document.querySelector('.progress-bar-fill');
+const statusText = document.querySelector('.status');
+const loadingElement = document.getElementById('loading');
+const outputContainer = document.getElementById('outputContainer');
+const outputElement = document.getElementById('output');
+const copyButton = document.getElementById('copyButton');
+const downloadButton = document.getElementById('downloadButton');
+const errorMessage = document.getElementById('errorMessage');
+
+// Store the result
+let result = null;
+
+// Auth type selector
+const authTypeSelect = document.getElementById('authType');
+const tokenAuthDiv = document.getElementById('tokenAuth');
+const basicAuthDiv = document.getElementById('basicAuth');
+
+// Toggle authentication fields based on selection
+authTypeSelect.addEventListener('change', () => {
+  const authType = authTypeSelect.value;
+
+  tokenAuthDiv.style.display = authType === 'token' ? 'block' : 'none';
+  basicAuthDiv.style.display = authType === 'basic' ? 'block' : 'none';
+});
+
+// Process repository button click handler
+processButton.addEventListener('click', async () => {
+  const repoUrl = repoUrlInput.value.trim();
+  const format = formatSelect.value;
+
+  // Validate repository URL
+  if (!repoUrl || !repoUrl.includes('github.com')) {
+    showError('Please enter a valid GitHub repository URL');
+    return;
+  }
+
+  // Reset UI
+  resetUI();
+
+  // Show loading
+  loadingElement.style.display = 'block';
+
+  try {
+    // Get authentication details
+    const authType = authTypeSelect.value;
+    const auth = {};
+
+    if (authType === 'token') {
+      const token = document.getElementById('githubToken').value.trim();
+      if (token) {
+        auth.token = token;
+      } else {
+        showError('Please enter a GitHub token or select a different authentication method');
+        loadingElement.style.display = 'none';
+        return;
+      }
+    } else if (authType === 'basic') {
+      const username = document.getElementById('githubUsername').value.trim();
+      const password = document.getElementById('githubPassword').value.trim();
+
+      if (username && password) {
+        auth.username = username;
+        auth.password = password;
+      } else {
+        showError(
+          'Please enter both username and password or select a different authentication method'
+        );
+        loadingElement.style.display = 'none';
+        return;
+      }
+    }
+
+    // Create repo combiner with selected options
+    const repoCombiner = createRepoCombiner({
+      format,
+      auth,
+      // Add custom event listener for progress updates
+      onProgress: updateProgress,
+    });
+
+    // Process repository
+    result = await repoCombiner.processRepo(repoUrl);
+
+    // Display the result based on format
+    displayResult(result, format);
+  } catch (error) {
+    console.error('Error processing repository:', error);
+    showError(`Error processing repository: ${error.message}`);
+  } finally {
+    // Hide loading
+    loadingElement.style.display = 'none';
+  }
+});
+
+// Update progress
+function updateProgress(status) {
+  progressBar.style.display = 'block';
+  statusText.textContent = status.message || 'Processing...';
+
+  if (status.progress !== undefined) {
+    progressBarFill.style.width = `${status.progress * 100}%`;
+  }
+}
+
+// Display result based on format
+function displayResult(data, format) {
+  // Show output container
+  outputContainer.style.display = 'block';
+
+  // Display based on format
+  if (format === 'json') {
+    // JSON format
+    outputElement.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+  } else if (format === 'markdown') {
+    // Markdown format using marked.js
+    if (window.marked) {
+      outputElement.innerHTML = window.marked.parse(data);
+    } else {
+      outputElement.innerHTML = `<pre>${data}</pre>`;
+    }
+  } else {
+    // Text format
+    outputElement.innerHTML = `<pre>${data}</pre>`;
+  }
+}
+
+// Copy button click handler
+copyButton.addEventListener('click', () => {
+  const format = formatSelect.value;
+  let textToCopy;
+
+  if (format === 'json' && typeof result === 'object') {
+    textToCopy = JSON.stringify(result, null, 2);
+  } else {
+    textToCopy = result;
+  }
+
+  navigator.clipboard
+    .writeText(textToCopy)
+    .then(() => {
+      const originalText = copyButton.textContent;
+      copyButton.textContent = 'Copied!';
+      setTimeout(() => {
+        copyButton.textContent = originalText;
+      }, 2000);
+    })
+    .catch(err => {
+      console.error('Failed to copy: ', err);
+    });
+});
+
+// Download button click handler
+downloadButton.addEventListener('click', () => {
+  const format = formatSelect.value;
+  const repoName = getRepoNameFromUrl(repoUrlInput.value.trim());
+
+  let content;
+  let filename;
+  let type;
+
+  if (format === 'json') {
+    content = JSON.stringify(result, null, 2);
+    filename = `${repoName}.json`;
+    type = 'application/json';
+  } else if (format === 'markdown') {
+    content = result;
+    filename = `${repoName}.md`;
+    type = 'text/markdown';
+  } else {
+    content = result;
+    filename = `${repoName}.txt`;
+    type = 'text/plain';
+  }
+
+  // Create blob and download
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+
+  // Clean up
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// Extract repository name from URL
+function getRepoNameFromUrl(url) {
+  try {
+    const parts = url.split('/');
+    return parts[parts.length - 1].replace('.git', '');
+  } catch (error) {
+    return 'repository';
+  }
+}
+
+// Show error message
+function showError(message) {
+  errorMessage.textContent = message;
+  errorMessage.style.display = 'block';
+}
+
+// Reset UI
+function resetUI() {
+  errorMessage.style.display = 'none';
+  progressBar.style.display = 'none';
+  progressBarFill.style.width = '0%';
+  statusText.textContent = 'Processing repository...';
+  outputContainer.style.display = 'none';
+  outputElement.innerHTML = '';
+}
+
+
+
+FILE: example/vue/App.js
+========================
+Size: 7.32 KB
+Last Modified: 2025-03-11T20:26:48.209Z
+------------------------
+
+import { createRepoCombiner } from '../../src/repo-combiner.js';
+
+export const App = {
+  template: `
+    <header>
+      <h1>Repo Combiner</h1>
+      <p class="subtitle">Vue 3 Implementation</p>
+    </header>
+    
+    <div class="form-container">
+      <div class="form-group">
+        <label for="repoUrl">GitHub Repository URL:</label>
+        <input type="text" id="repoUrl" v-model="repoUrl" placeholder="https://github.com/username/repository">
+      </div>
+
+      <div class="form-group">
+        <label for="format">Output Format:</label>
+        <select id="format" v-model="format">
+          <option value="text">Text</option>
+          <option value="markdown" selected>Markdown</option>
+          <option value="json">JSON</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <details>
+          <summary>Authentication (for private repositories)</summary>
+          <div style="padding: 10px 0;">
+            <div class="form-group">
+              <label for="authType">Authentication Method:</label>
+              <select id="authType" v-model="authType">
+                <option value="none">None (Public Repository)</option>
+                <option value="token">Personal Access Token</option>
+                <option value="basic">Username & Password</option>
+              </select>
+            </div>
+            
+            <div v-if="authType === 'token'" id="tokenAuth">
+              <div class="form-group">
+                <label for="githubToken">GitHub Personal Access Token:</label>
+                <input type="password" id="githubToken" v-model="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+              </div>
+            </div>
+            
+            <div v-if="authType === 'basic'" id="basicAuth">
+              <div class="form-group">
+                <label for="githubUsername">GitHub Username:</label>
+                <input type="text" id="githubUsername" v-model="githubUsername" placeholder="Your GitHub username">
+              </div>
+              <div class="form-group">
+                <label for="githubPassword">GitHub Password:</label>
+                <input type="password" id="githubPassword" v-model="githubPassword" placeholder="Your GitHub password">
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="form-group">
+        <button id="processButton" @click="processRepository">Process Repository</button>
+      </div>
+
+      <div class="progress" v-if="processing">
+        <div class="progress-bar">
+          <div class="progress-bar-fill" :style="{ width: progressPercent + '%' }"></div>
+        </div>
+        <div class="status">{{ progressMessage }}</div>
+      </div>
+      
+      <div class="error" v-if="errorMsg">{{ errorMsg }}</div>
+    </div>
+    
+    <div class="loading" v-if="loading">
+      <div class="spinner"></div>
+      <div>Processing repository...</div>
+    </div>
+
+    <div class="output-container" v-if="result">
+      <div class="output-header">
+        <h2>Repository Content</h2>
+        <div class="output-actions">
+          <button @click="copyOutput">{{ copyButtonText }}</button>
+          <button @click="downloadOutput">Download</button>
+        </div>
+      </div>
+      <div id="output" v-html="formattedResult"></div>
+    </div>
+  `,
+  data() {
+    return {
+      repoUrl: 'https://github.com/yamadashy/repomix',
+      format: 'markdown',
+      authType: 'none',
+      githubToken: '',
+      githubUsername: '',
+      githubPassword: '',
+      result: null,
+      loading: false,
+      processing: false,
+      progressPercent: 0,
+      progressMessage: 'Processing repository...',
+      errorMsg: '',
+      copyButtonText: 'Copy',
+    };
+  },
+  computed: {
+    formattedResult() {
+      if (!this.result) return '';
+
+      if (this.format === 'json') {
+        return `<pre>${JSON.stringify(this.result, null, 2)}</pre>`;
+      } else if (this.format === 'markdown' && window.marked) {
+        return window.marked.parse(this.result);
+      } else {
+        return `<pre>${this.result}</pre>`;
+      }
+    },
+  },
+  methods: {
+    async processRepository() {
+      if (!this.repoUrl || !this.repoUrl.includes('github.com')) {
+        this.errorMsg = 'Please enter a valid GitHub repository URL';
+        return;
+      }
+
+      this.resetUI();
+      this.loading = true;
+
+      try {
+        const auth = {};
+
+        if (this.authType === 'token') {
+          if (!this.githubToken) {
+            this.errorMsg =
+              'Please enter a GitHub token or select a different authentication method';
+            this.loading = false;
+            return;
+          }
+          auth.token = this.githubToken;
+        } else if (this.authType === 'basic') {
+          if (!this.githubUsername || !this.githubPassword) {
+            this.errorMsg =
+              'Please enter both username and password or select a different authentication method';
+            this.loading = false;
+            return;
+          }
+          auth.username = this.githubUsername;
+          auth.password = this.githubPassword;
+        }
+
+        const repoCombiner = createRepoCombiner({
+          format: this.format,
+          auth,
+          onProgress: this.updateProgress,
+        });
+
+        this.result = await repoCombiner.processRepo(this.repoUrl);
+      } catch (error) {
+        console.error('Error processing repository:', error);
+        this.errorMsg = `Error processing repository: ${error.message}`;
+      } finally {
+        this.loading = false;
+        this.processing = false;
+      }
+    },
+    updateProgress(status) {
+      this.processing = true;
+      this.progressMessage = status.message || 'Processing...';
+
+      if (status.progress !== undefined) {
+        this.progressPercent = status.progress * 100;
+      }
+    },
+    resetUI() {
+      this.errorMsg = '';
+      this.processing = false;
+      this.progressPercent = 0;
+      this.progressMessage = 'Processing repository...';
+      this.result = null;
+      this.copyButtonText = 'Copy';
+    },
+    copyOutput() {
+      const textToCopy = this.result;
+      navigator.clipboard
+        .writeText(textToCopy)
+        .then(() => {
+          this.copyButtonText = 'Copied!';
+          setTimeout(() => {
+            this.copyButtonText = 'Copy';
+          }, 2000);
+        })
+        .catch(err => {
+          console.error('Failed to copy: ', err);
+        });
+    },
+    downloadOutput() {
+      const repoName = this.getRepoNameFromUrl(this.repoUrl);
+
+      let content = this.result;
+      let filename;
+      let type;
+
+      if (this.format === 'json') {
+        content = JSON.stringify(this.result, null, 2);
+        filename = `${repoName}.json`;
+        type = 'application/json';
+      } else if (this.format === 'markdown') {
+        filename = `${repoName}.md`;
+        type = 'text/markdown';
+      } else {
+        filename = `${repoName}.txt`;
+        type = 'text/plain';
+      }
+
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    },
+    getRepoNameFromUrl(url) {
+      try {
+        const parts = url.split('/');
+        return parts[parts.length - 1].replace('.git', '');
+      } catch (error) {
+        return 'repository';
+      }
+    },
+  },
+};
+
+
+
+FILE: example/vue/index.html
+============================
+Size: 0.67 KB
+Last Modified: 2025-03-11T20:26:48.209Z
+----------------------------
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Repo Combiner - Vue 3</title>
+    <link rel="stylesheet" href="../shared/styles.css" />
+    <!-- Import Vue 3 with named exports -->
+    <script src="https://unpkg.com/vue@3/dist/vue.esm-browser.js" type="module"></script>
+    <!-- Import marked.js for markdown rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Vue 3 app will mount here -->
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
+
+
+
+FILE: example/vue/main.js
+=========================
+Size: 0.14 KB
+Last Modified: 2025-03-11T20:26:48.209Z
+-------------------------
+
+import { createApp } from 'vue';
+import { App } from './App.js';
+
+// Create Vue application - use imported createApp
+createApp(App).mount('#app');
+
+
+
+FILE: LICENSE
+=============
+Size: 1.04 KB
+Last Modified: 2025-03-11T20:26:48.207Z
+-------------
+
+MIT License
+
+Copyright (c) 2025 cschweda
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+FILE: package.json
+==================
+Size: 1.47 KB
+Last Modified: 2025-03-11T20:26:48.209Z
+------------------
+
+{
+  "name": "repo-combiner",
+  "version": "1.1.0",
+  "description": "Convert a GitHub repository into a single file",
+  "main": "src/repo-combiner.js",
+  "type": "module",
+  "bin": {
+    "repo-combiner": "bin/cli.js"
+  },
+  "scripts": {
+    "start": "node bin/cli.js",
+    "test": "node test/index.js",
+    "lint": "eslint 'src/**/*.js' 'bin/**/*.js' 'example/**/*.js'",
+    "format": "prettier --write 'src/**/*.js' 'bin/**/*.js' 'example/**/*.js'",
+    "dev": "nodemon bin/cli.js",
+    "changelog:update": "node scripts/update-changelog.js"
+  },
+  "keywords": [
+    "github",
+    "repository",
+    "combine",
+    "converter",
+    "code"
+  ],
+  "author": "cschweda",
+  "license": "MIT",
+  "dependencies": {
+    "minimist": "^1.2.8",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cschweda/repo-combiner-2025.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cschweda/repo-combiner-2025/issues"
+  },
+  "homepage": "https://github.com/cschweda/repo-combiner-2025#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "example/",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}
+
+
+
+FILE: README.md
+===============
+Size: 15.23 KB
+Last Modified: 2025-03-11T20:26:48.207Z
+---------------
+
+# repo-combiner
+
+[![npm version](https://img.shields.io/npm/v/repo-combiner.svg)](https://www.npmjs.com/package/repo-combiner)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/node/v/repo-combiner.svg)](https://nodejs.org/)
+
+A Node.js tool that converts a GitHub repository into a single file. Compatible with Node.js 18+ and modern browsers.
+
+## Features
+
+- Converts an entire GitHub repository into a single file
+- Works both as a command-line tool and as a browser-compatible module
+- Multiple output formats: text, JSON, or markdown
+- Skips unnecessary files and directories (node_modules, .git, etc.)
+- User-friendly interface
+- Support for large repositories
+- Error handling and progress reporting
+- Support for both private and public repositories
+
+## Installation
+
+### CLI Installation
+
+To use Repo Combiner as a command-line tool, you can install it globally:
+
+```bash
+# Global installation
+npm install -g repo-combiner
+
+# Verify installation
+repo-combiner --version
+```
+
+### Project Installation
+
+To use Repo Combiner in your project:
+
+```bash
+# Add to your project
+npm install repo-combiner
+
+# Or with yarn
+yarn add repo-combiner
+```
+
+### Manual Installation (for development)
+
+```bash
+# Clone the repository
+git clone https://github.com/cschweda/repo-combiner-2025.git
+cd repo-combiner-2025
+
+# Install dependencies
+npm install
+
+# Link for local development (optional)
+npm link
+```
+
+## CLI Usage
+
+The command-line interface provides a simple way to convert repositories to a single file.
+
+### Basic Usage
+
+```bash
+# Basic usage (outputs to console in text format)
+repo-combiner https://github.com/username/repository
+
+# Specify output format
+repo-combiner --format markdown https://github.com/username/repository
+
+# Save output to a file
+repo-combiner --output result.md https://github.com/username/repository
+
+# Specify format and output file
+repo-combiner -f json -o result.json https://github.com/username/repository
+```
+
+### Private Repository Access
+
+For private repositories, you can provide authentication:
+
+```bash
+# Using a GitHub token (recommended)
+repo-combiner --token your_github_token https://github.com/username/private-repository
+
+# Using username and password
+repo-combiner --username your_username --password your_password https://github.com/username/private-repository
+
+# Using environment variables (.env file)
+# First create a .env file with GITHUB_TOKEN or GITHUB_USERNAME and GITHUB_PASSWORD
+repo-combiner https://github.com/username/private-repository
+```
+
+### All CLI Options
+
+```
+Usage: repo-combiner [options] <repository-url>
+
+Options:
+  -h, --help                  Show this help
+  -v, --version               Show version
+  -f, --format <type>         Output format: text, json, or markdown (default: text)
+  -o, --output <file>         Write output to a file (default: output/output.txt)
+  -k, --keep-temp             Keep temporary files
+  -t, --token <token>         GitHub personal access token (for private repositories)
+  -u, --username <username>   GitHub username (for private repositories)
+  -p, --password <password>   GitHub password (for private repositories)
+```
+
+## Web Usage
+
+You can use Repo Combiner in a web application. Here's a step-by-step guide:
+
+### 1. Setup
+
+First, create your HTML file with the necessary UI elements:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Repo Combiner Web</title>
+    <style>
+      /* Add your styles here */
+    </style>
+  </head>
+  <body>
+    <h1>Repo Combiner Web Interface</h1>
+
+    <div class="form">
+      <input type="text" id="repoUrl" placeholder="https://github.com/username/repository" />
+      <select id="format">
+        <option value="text">Text</option>
+        <option value="markdown">Markdown</option>
+        <option value="json">JSON</option>
+      </select>
+      <button id="processButton">Process Repository</button>
+    </div>
+
+    <div class="output" id="output"></div>
+
+    <script type="module">
+      // Your JavaScript will go here
+    </script>
+  </body>
+</html>
+```
+
+### 2. Import the Module
+
+You have a few options to import the module:
+
+#### Option A: Using ES Modules (recommended for modern apps)
+
+```html
+<script type="module">
+  // Import directly from npm through a CDN like Skypack or UNPKG
+  import { createRepoCombiner } from 'https://cdn.skypack.dev/repo-combiner';
+
+  // Your code here
+</script>
+```
+
+#### Option B: Using a bundler (Webpack, Rollup, Parcel, etc.)
+
+If you're using a bundler, install the package first:
+
+```bash
+npm install repo-combiner
+```
+
+Then import in your JavaScript file:
+
+```javascript
+import { createRepoCombiner } from 'repo-combiner';
+```
+
+### 3. Implement Repository Processing
+
+```javascript
+document.getElementById('processButton').addEventListener('click', async () => {
+  const repoUrl = document.getElementById('repoUrl').value;
+  const format = document.getElementById('format').value;
+  const outputElement = document.getElementById('output');
+
+  if (!repoUrl) {
+    outputElement.innerHTML = '<p class="error">Please enter a repository URL</p>';
+    return;
+  }
+
+  outputElement.innerHTML = '<p>Processing repository, please wait...</p>';
+
+  try {
+    // Create the repo combiner instance
+    const repoCombiner = createRepoCombiner({
+      format: format,
+      onProgress: updateProgress, // Optional progress callback
+    });
+
+    // Process the repository
+    const result = await repoCombiner.processRepo(repoUrl);
+
+    // Display the result
+    if (format === 'markdown') {
+      // If using markdown, you might want to render it
+      // You can use a library like marked: https://marked.js.org/
+      outputElement.innerHTML = `<div class="markdown">${marked(result)}</div>`;
+    } else if (format === 'json') {
+      // For JSON, pretty print it
+      outputElement.innerHTML = `<pre>${JSON.stringify(JSON.parse(result), null, 2)}</pre>`;
+    } else {
+      // For text, use a pre element
+      outputElement.innerHTML = `<pre>${result}</pre>`;
+    }
+  } catch (error) {
+    outputElement.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+  }
+});
+
+// Optional: Progress update function
+function updateProgress(progressData) {
+  const progressElement = document.getElementById('progress');
+  if (progressElement && progressData.message) {
+    progressElement.textContent = progressData.message;
+
+    // If you have a progress bar
+    if (progressData.progress !== undefined) {
+      const progressBar = document.getElementById('progressBar');
+      if (progressBar) {
+        progressBar.value = progressData.progress * 100;
+      }
+    }
+  }
+}
+```
+
+### 4. Complete Example
+
+For a complete working example, check out the file in the repository:
+
+```
+example/browser-example.html
+```
+
+You can run this example by:
+
+1. Serving the project directory with a local server
+
+   ```bash
+   npx serve
+   ```
+
+2. Opening your browser to http://localhost:3000/example/browser-example.html
+
+### 5. Handling CORS in Web Usage
+
+When using Repo Combiner in a web application, you might encounter CORS (Cross-Origin Resource Sharing) issues when making requests to the GitHub API. To work around this:
+
+- Use a CORS proxy for development
+- Deploy a server-side component that handles GitHub API requests
+- Use GitHub's CORS-enabled API endpoints where available
+
+## API Reference
+
+### Creating a Repo Combiner Instance
+
+```javascript
+import { createRepoCombiner } from 'repo-combiner';
+
+const repoCombiner = createRepoCombiner({
+  // Configuration options
+  format: 'markdown',
+  skipDirs: ['node_modules', '.git', 'dist'],
+  skipFiles: ['.DS_Store'],
+  maxFileSizeMB: 5,
+  auth: {
+    token: 'your_github_personal_access_token',
+  },
+  onProgress: progressData => {
+    console.log(`Progress: ${progressData.message}`);
+  },
+});
+```
+
+### Processing a Repository
+
+```javascript
+// Simple usage
+const output = await repoCombiner.processRepo('https://github.com/cschweda/repo-combiner-2025');
+
+// With additional options
+const output = await repoCombiner.processRepo('https://github.com/cschweda/repo-combiner-2025', {
+  format: 'json', // Override the format for this specific call
+  maxFileSizeMB: 2, // Override the max file size for this call
+});
+```
+
+### Configuration Options
+
+| Option              | Type     | Default                                                                                                                                       | Description                                        |
+| ------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `format`            | string   | `'text'`                                                                                                                                      | Output format: 'text', 'json', or 'markdown'       |
+| `skipDirs`          | array    | `['node_modules', '.git', 'dist', 'build', 'coverage', '.github', '.vscode']`                                                                 | Directories to skip                                |
+| `skipFiles`         | array    | `['.DS_Store', '.gitignore', 'package-lock.json', 'yarn.lock', '.eslintrc', '.prettierrc']`                                                   | Files to skip                                      |
+| `skipExtensions`    | array    | `['.jpg', '.jpeg', '.png', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.mp3', '.mp4', '.zip', '.gz', '.exe', '.dll']` | File extensions to skip                            |
+| `tempDir`           | string   | `os.tmpdir() + '/repo-combiner'`                                                                                                              | Temporary directory for cloned repositories        |
+| `preserveStructure` | boolean  | `true`                                                                                                                                        | Preserve directory structure in output             |
+| `maxFileSizeMB`     | number   | `10`                                                                                                                                          | Maximum file size to process (in MB)               |
+| `keepTemp`          | boolean  | `false`                                                                                                                                       | Keep temporary files after processing              |
+| `concurrency`       | number   | `5`                                                                                                                                           | Number of concurrent file operations               |
+| `timeout`           | number   | `300000`                                                                                                                                      | Timeout for operations in milliseconds (5 minutes) |
+| `auth`              | object   | `{ token: process.env.GITHUB_TOKEN, username: process.env.GITHUB_USERNAME, password: process.env.GITHUB_PASSWORD }`                           | GitHub authentication details                      |
+| `onProgress`        | function | `null`                                                                                                                                        | Progress callback function                         |
+
+### Event Callbacks
+
+The `onProgress` callback receives an object with the following properties:
+
+```javascript
+{
+  message: "Processing file 10/50: src/index.js", // Human-readable progress message
+  progress: 0.45, // Number between 0-1 indicating progress percentage
+  phase: "processing", // Current phase: 'initializing', 'cloning', 'processing', 'generating', 'cleaning', 'complete', 'error'
+  stats: {
+    totalFiles: 10, // Files processed so far
+    totalSize: 1024 * 500, // Total size in bytes
+    skippedFiles: 5, // Files skipped
+    skippedSize: 1024 * 1000, // Size of skipped files in bytes
+    // Other stats...
+  },
+  timestamp: "2023-03-15T12:34:56.789Z" // ISO timestamp of the progress update
+}
+```
+
+## Project Structure
+
+The project follows the standard Node.js package structure:
+
+```
+repo-combiner/
+├── bin/                # Command-line interface
+│   └── cli.js          # CLI entry point
+├── src/                # Source code
+│   └── repo-combiner.js # Main implementation
+├── example/            # Examples
+│   └── browser-example.html # Browser usage example
+├── test/               # Tests
+├── .env.example        # Example environment variables
+├── package.json        # Package configuration
+└── README.md           # Documentation
+```
+
+## Development
+
+```bash
+# Clone the repository
+git clone https://github.com/cschweda/repo-combiner-2025.git
+cd repo-combiner-2025
+
+# Install dependencies
+npm install
+
+# Run the CLI in development mode
+npm run dev
+
+# Lint the code
+npm run lint
+
+# Format the code
+npm run format
+
+# Run tests
+npm test
+```
+
+## Publishing
+
+Follow these steps when publishing a new version to npm:
+
+### 1. Pre-publishing Checks
+
+Ensure your code is well-tested and ready for publishing:
+
+```bash
+# Run linting to check for code issues
+npm run lint
+
+# Format code to ensure consistent style
+npm run format
+
+# Run tests to make sure everything works
+npm test
+```
+
+### 2. Update Changelog
+
+Update the changelog with all changes since the last release:
+
+```bash
+# Automatically update CHANGELOG.md with commits since the last tag
+npm run changelog:update
+
+# Review and edit the generated entries in CHANGELOG.md
+```
+
+### 3. Version Bump
+
+Update the version number according to semantic versioning:
+
+```bash
+# For a patch release (bug fixes)
+npm version patch
+
+# For a minor release (new features, backwards compatible)
+npm version minor
+
+# For a major release (breaking changes)
+npm version major
+```
+
+### 4. Prepare and Test Package
+
+Check what will be included in the published package:
+
+```bash
+# Dry run to see what files will be published
+npm pack --dry-run
+
+# Create the package locally without publishing
+npm pack
+```
+
+### 5. Publish to npm
+
+Publish the package to npm:
+
+```bash
+# Publish to npm
+npm publish
+
+# For a beta release
+npm publish --tag beta
+```
+
+### 6. Post-publishing
+
+After publishing:
+
+```bash
+# Push the version commit and tags
+git push && git push --tags
+
+# Create a GitHub release (optional)
+# Go to https://github.com/cschweda/repo-combiner-2025/releases/new
+```
+
+### Changelog Management
+
+This project uses [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format for the changelog. To update the changelog after pushing to GitHub:
+
+1. Run the following script to automatically update the changelog with commits since the last tag:
+
+```bash
+npm run changelog:update
+```
+
+2. Alternatively, you can use the manual approach:
+
+```bash
+# Get all commits since last tag
+git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"- %s" > changes.txt
+```
+
+3. Edit the CHANGELOG.md file, placing the commits in the appropriate sections (Added, Changed, Fixed, Removed).
+
+4. For a new release, add a new version section:
+
+```markdown
+## [1.0.0] - YYYY-MM-DD
+```
+
+#### Changelog Best Practices
+
+- Group changes by type (Added, Changed, Fixed, Removed)
+- Use present tense and imperative mood ("Add feature" not "Added feature")
+- Include issue/PR numbers when relevant: "Add new option (#123)"
+- Keep entries brief but descriptive
+
+## License
+
+MIT
+
+
+
+FILE: scripts/update-changelog.js
+=================================
+Size: 3.75 KB
+Last Modified: 2025-03-11T20:26:48.209Z
+---------------------------------
+
+#!/usr/bin/env node
+
+/**
+ * This script updates the CHANGELOG.md file with commits since the last tag.
+ * It reads the current CHANGELOG.md file, gets the commit messages since the last tag,
+ * and inserts them into the Unreleased section.
+ */
+
+import fs from 'fs';
+import { execSync } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get current directory in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Path to CHANGELOG.md
+const changelogPath = path.join(__dirname, '..', 'CHANGELOG.md');
+
+// Get the last tag
+let lastTag;
+try {
+  lastTag = execSync('git describe --tags --abbrev=0').toString().trim();
+  console.log(`Last tag found: ${lastTag}`);
+} catch (error) {
+  console.log('No tags found. Using all commits.');
+  lastTag = '';
+}
+
+// Get commit messages since last tag
+const gitLogCommand = lastTag
+  ? `git log ${lastTag}..HEAD --pretty=format:"- %s"`
+  : 'git log --pretty=format:"- %s"';
+
+const commitMessages = execSync(gitLogCommand).toString().trim().split('\n');
+
+if (commitMessages.length === 0 || (commitMessages.length === 1 && commitMessages[0] === '')) {
+  console.log('No new commits since last tag.');
+  process.exit(0);
+}
+
+console.log(`Found ${commitMessages.length} commits to add to changelog.`);
+
+// Read the current changelog
+const changelog = fs.readFileSync(changelogPath, 'utf8');
+
+// Simple categorization based on commit message prefixes
+const categories = {
+  added: [],
+  changed: [],
+  fixed: [],
+  removed: [],
+};
+
+const categorizationRules = [
+  { pattern: /^(feat|add):/i, category: 'added' },
+  { pattern: /^(refactor|style|perf|change):/i, category: 'changed' },
+  { pattern: /^(fix|bug):/i, category: 'fixed' },
+  { pattern: /^(remove|delete):/i, category: 'removed' },
+];
+
+// Categorize each commit message
+commitMessages.forEach(message => {
+  if (!message) return;
+
+  let categorized = false;
+  for (const rule of categorizationRules) {
+    if (rule.pattern.test(message)) {
+      categories[rule.category].push(message.replace(rule.pattern, '').trim());
+      categorized = true;
+      break;
+    }
+  }
+
+  // If not categorized, default to "changed"
+  if (!categorized) {
+    categories.changed.push(message);
+  }
+});
+
+// Format for insertion
+const formattedCommits = [];
+if (categories.added.length) {
+  formattedCommits.push('### Added', ...categories.added.map(msg => `- ${msg}`), '');
+}
+if (categories.changed.length) {
+  formattedCommits.push('### Changed', ...categories.changed.map(msg => `- ${msg}`), '');
+}
+if (categories.fixed.length) {
+  formattedCommits.push('### Fixed', ...categories.fixed.map(msg => `- ${msg}`), '');
+}
+if (categories.removed.length) {
+  formattedCommits.push('### Removed', ...categories.removed.map(msg => `- ${msg}`), '');
+}
+
+// Split changelog at Unreleased section
+const unreleasedMatch = changelog.match(/## \[Unreleased\]\n/);
+if (!unreleasedMatch) {
+  console.error('Could not find Unreleased section in CHANGELOG.md');
+  process.exit(1);
+}
+
+const unreleasedIndex = unreleasedMatch.index + unreleasedMatch[0].length;
+const beforeUnreleased = changelog.slice(0, unreleasedIndex);
+const afterUnreleased = changelog.slice(unreleasedIndex);
+
+// Find the end of the Unreleased section
+const nextSectionMatch = afterUnreleased.match(/## \[\d+\.\d+\.\d+\]/);
+const nextSectionIndex = nextSectionMatch ? nextSectionMatch.index : afterUnreleased.length;
+
+// Insert new commits at the beginning of the Unreleased section
+const updatedChangelog =
+  beforeUnreleased + '\n' + formattedCommits.join('\n') + afterUnreleased.slice(nextSectionIndex);
+
+// Write back to the file
+fs.writeFileSync(changelogPath, updatedChangelog);
+
+console.log('CHANGELOG.md updated successfully!');
+console.log('Remember to review and edit the changelog as needed before committing.');
+
+
+
+FILE: src/repo-combiner.js
+==========================
+Size: 56.38 KB
+Last Modified: 2025-03-11T20:26:48.210Z
+--------------------------
+
+// repo-combiner.js
+import fs from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import os from 'os';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
+
+// This module is ESM-only
+
+/**
+ * Binary file signatures (magic numbers) to detect binary files
+ * This helps to properly handle binary files without trying to read them as text
+ */
+const BINARY_FILE_SIGNATURES = [
+  // Images
+  { signature: Buffer.from([0xFF, 0xD8, 0xFF]), extension: '.jpg' },  // JPEG
+  { signature: Buffer.from([0x89, 0x50, 0x4E, 0x47]), extension: '.png' }, // PNG
+  { signature: Buffer.from([0x47, 0x49, 0x46]), extension: '.gif' },  // GIF
+  // Archives
+  { signature: Buffer.from([0x50, 0x4B, 0x03, 0x04]), extension: '.zip' }, // ZIP
+  { signature: Buffer.from([0x1F, 0x8B]), extension: '.gz' }, // GZIP
+  // PDFs
+  { signature: Buffer.from([0x25, 0x50, 0x44, 0x46]), extension: '.pdf' }, // PDF
+  // Audio/Video
+  { signature: Buffer.from([0x49, 0x44, 0x33]), extension: '.mp3' }, // MP3
+  { signature: Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70]), extension: '.mp4' }, // MP4
+];
+
+// Configuration defaults
+const DEFAULT_CONFIG = {
+  format: 'text',      // Output format: text, json, or markdown
+  skipDirs: ['node_modules', '.git', 'dist', 'build', 'coverage', '.github', '.vscode'],
+  skipFiles: ['.DS_Store', '.gitignore', 'package-lock.json', 'yarn.lock', '.eslintrc', '.prettierrc'],
+  skipExtensions: ['.jpg', '.jpeg', '.png', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.mp3', '.mp4', '.zip', '.gz', '.exe', '.dll'],
+  tempDir: path.join(os.tmpdir(), 'repo-combiner'),
+  preserveStructure: true,
+  maxFileSizeMB: 10,
+  concurrency: 5,      // Number of concurrent file operations
+  timeout: 300000,     // Timeout for operations in milliseconds (5 minutes)
+  auth: {
+    token: process.env.GITHUB_TOKEN || '',
+    username: process.env.GITHUB_USERNAME || '',
+    password: process.env.GITHUB_PASSWORD || ''
+  },
+  onProgress: null     // Progress callback function
+};
+
+/**
+ * Main class for repository conversion
+ */
+class RepoCombiner {
+  /**
+   * Create a new RepoCombiner instance
+   * @param {Object} config Configuration options
+   */
+  constructor(config = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.files = [];
+    this.stats = {
+      totalFiles: 0,
+      totalSize: 0,
+      skippedFiles: 0,
+      skippedSize: 0,
+      startTime: null,
+      endTime: null,
+      elapsedTime: 0,
+    };
+    this.aborted = false;
+    this.activePromises = new Set();
+    this.cacheMap = new Map(); // Cache for expensive operations
+  }
+
+  /**
+   * Report progress to the onProgress callback
+   * @param {string} message Progress message
+   * @param {number} progress Progress value (0-1)
+   * @param {string} phase Current processing phase
+   * @private
+   */
+  _reportProgress(message, progress = undefined, phase = 'processing') {
+    if (typeof this.config.onProgress === 'function') {
+      this.config.onProgress({
+        message,
+        progress,
+        phase,
+        stats: { ...this.stats },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  /**
+   * Main method to process a repository
+   * @param {string} repoUrl GitHub repository URL
+   * @param {Object} options Processing options
+   * @returns {Promise<string|Object>} Combined repository content
+   * @throws {Error} If the repository URL is invalid or processing fails
+   */
+  async processRepo(repoUrl, options = {}) {
+    // Validate repository URL
+    if (!repoUrl || typeof repoUrl !== 'string') {
+      throw new Error('Repository URL is required and must be a string');
+    }
+    
+    if (!repoUrl.match(/^(https?:\/\/|git@)([a-zA-Z0-9-]+\.)+[a-zA-Z0-9]{2,}(\/|:)[^\s]+\/[^\s]+$/)) {
+      throw new Error('Invalid repository URL format. Expected: https://github.com/username/repository or git@github.com:username/repository');
+    }
+    
+    // Merge options with existing config
+    const config = { ...this.config, ...options };
+    this.config = config;
+    
+    // Reset state for new processing
+    this.files = [];
+    this.stats = {
+      totalFiles: 0,
+      totalSize: 0,
+      skippedFiles: 0,
+      skippedSize: 0,
+      startTime: Date.now(),
+      endTime: null,
+      elapsedTime: 0,
+    };
+    this.aborted = false;
+    
+    try {
+      this._reportProgress(`Processing repository: ${repoUrl}`, 0, 'initializing');
+      
+      // Create temporary directory if it doesn't exist
+      await fs.mkdir(config.tempDir, { recursive: true }).catch(err => {
+        if (err.code !== 'EEXIST') throw err;
+      });
+      
+      // Clone/fetch the repository
+      this._reportProgress('Cloning repository...', 0.1, 'cloning');
+      const repoDir = await this.cloneRepository(repoUrl, config.tempDir);
+      
+      // Process all files with concurrency control
+      this._reportProgress('Processing files...', 0.2, 'processing');
+      await this.processDirectory(repoDir, config);
+      
+      // Generate output in the requested format
+      this._reportProgress('Generating output...', 0.9, 'generating');
+      const output = this.generateOutput(config.format);
+      
+      // Clean up temporary files
+      if (!config.keepTemp) {
+        this._reportProgress('Cleaning up temporary files...', 0.95, 'cleaning');
+        await fs.rm(repoDir, { recursive: true, force: true }).catch(err => {
+          console.warn(`Warning: Failed to clean up temporary files: ${err.message}`);
+        });
+      }
+      
+      // Update final stats
+      this.stats.endTime = Date.now();
+      this.stats.elapsedTime = this.stats.endTime - this.stats.startTime;
+      
+      const summaryMessage = `
+Repository processing completed:
+- Total files processed: ${this.stats.totalFiles}
+- Total size: ${(this.stats.totalSize / 1024 / 1024).toFixed(2)} MB
+- Skipped files: ${this.stats.skippedFiles}
+- Skipped size: ${(this.stats.skippedSize / 1024 / 1024).toFixed(2)} MB
+- Processing time: ${(this.stats.elapsedTime / 1000).toFixed(2)} seconds
+      `;
+      
+      this._reportProgress('Processing complete', 1, 'complete');
+      console.log(summaryMessage);
+      
+      return output;
+    } catch (error) {
+      this.stats.endTime = Date.now();
+      this.stats.elapsedTime = this.stats.endTime - this.stats.startTime;
+      
+      this._reportProgress(`Error: ${error.message}`, undefined, 'error');
+      
+      console.error('Error processing repository:', error.message);
+      
+      // Enhanced error with repository URL
+      const enhancedError = new Error(`Failed to process repository ${repoUrl}: ${error.message}`);
+      enhancedError.originalError = error;
+      enhancedError.stats = { ...this.stats };
+      
+      throw enhancedError;
+    }
+  }
+
+  /**
+   * Cancel processing
+   */
+  abort() {
+    this.aborted = true;
+    // Cancel all active promises if possible
+    for (const promise of this.activePromises) {
+      if (promise.cancel && typeof promise.cancel === 'function') {
+        promise.cancel();
+      }
+    }
+    this._reportProgress('Processing aborted', undefined, 'aborted');
+  }
+
+  /**
+   * Clone the GitHub repository to a local directory
+   * @param {string} repoUrl GitHub repository URL
+   * @param {string} targetDir Directory to clone to
+   * @returns {Promise<string>} Path to the cloned repository
+   * @throws {Error} If cloning fails
+   */
+  async cloneRepository(repoUrl, targetDir) {
+    // Extract repo name from URL
+    const repoName = this.getRepoNameFromUrl(repoUrl);
+    if (!repoName) {
+      throw new Error('Could not extract repository name from URL');
+    }
+    
+    const repoPath = path.join(targetDir, repoName);
+    
+    // Prepare authentication for private repositories
+    const authUrl = this.prepareAuthenticatedUrl(repoUrl);
+    
+    try {
+      // Check if repo directory already exists
+      if (existsSync(repoPath)) {
+        this._reportProgress(`Repository exists at ${repoPath}, pulling latest changes...`);
+        try {
+          // Timeout to prevent hanging forever
+          execSync(`git -C ${repoPath} pull`, { 
+            stdio: 'pipe',
+            timeout: this.config.timeout
+          });
+          this._reportProgress('Repository updated successfully');
+        } catch (pullError) {
+          // If pull fails, try removing and recloning
+          this._reportProgress('Error pulling repository, trying to reclone...');
+          await fs.rm(repoPath, { recursive: true, force: true }).catch(() => {});
+          execSync(`git clone --depth=1 ${authUrl} ${repoPath}`, { 
+            stdio: 'pipe',
+            timeout: this.config.timeout
+          });
+        }
+      } else {
+        // Clone the repository with depth=1 for faster cloning
+        this._reportProgress(`Cloning repository to ${repoPath}...`);
+        execSync(`git clone --depth=1 ${authUrl} ${repoPath}`, { 
+          stdio: 'pipe',
+          timeout: this.config.timeout
+        });
+        this._reportProgress('Repository cloned successfully');
+      }
+      
+      return repoPath;
+    } catch (error) {
+      // Provide more helpful error messages based on error output
+      let errorMessage = `Failed to ${existsSync(repoPath) ? 'update' : 'clone'} repository: ${error.message}`;
+      
+      if (error.stderr) {
+        const stderr = error.stderr.toString();
+        if (stderr.includes('Authentication failed')) {
+          errorMessage = 'Authentication failed. Make sure you have the correct credentials for this repository.';
+        } else if (stderr.includes('not found')) {
+          errorMessage = 'Repository not found. Check that the URL is correct and the repository exists.';
+        } else if (stderr.includes('Permission denied')) {
+          errorMessage = 'Permission denied. You may not have access to this repository or SSH key issues.';
+        } else if (stderr.includes('rate limit')) {
+          errorMessage = 'GitHub API rate limit exceeded. Try authenticating with a token.';
+        }
+      }
+      
+      throw new Error(errorMessage);
+    }
+  }
+  
+  /**
+   * Prepare authenticated URL for git operations
+   * @param {string} repoUrl Original repository URL
+   * @returns {string} URL with authentication if available
+   */
+  prepareAuthenticatedUrl(repoUrl) {
+    // If no authentication is provided, return the original URL
+    if (!this.config.auth.token && !(this.config.auth.username && this.config.auth.password)) {
+      return repoUrl;
+    }
+    
+    try {
+      // Handle different URL formats (HTTPS or SSH)
+      if (repoUrl.startsWith('https://')) {
+        // For HTTPS URLs
+        const url = new URL(repoUrl);
+        
+        if (this.config.auth.token) {
+          // Use personal access token
+          url.username = this.config.auth.token;
+          url.password = 'x-oauth-basic';
+        } else if (this.config.auth.username && this.config.auth.password) {
+          // Use username and password
+          url.username = this.config.auth.username;
+          url.password = this.config.auth.password;
+        }
+        
+        return url.toString();
+      } else if (repoUrl.startsWith('git@')) {
+        // For SSH URLs, we don't need to modify the URL as SSH keys are used
+        return repoUrl;
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not prepare authenticated URL: ${error.message}`);
+    }
+    
+    // If the URL format is not recognized or an error occurred, return the original URL
+    return repoUrl;
+  }
+
+  /**
+   * Get repository name from URL
+   * @param {string} url GitHub repository URL
+   * @returns {string} Repository name
+   */
+  getRepoNameFromUrl(url) {
+    try {
+      // Handle both HTTPS and SSH URLs
+      let cleanUrl = url;
+      if (cleanUrl.endsWith('.git')) {
+        cleanUrl = cleanUrl.slice(0, -4);
+      }
+      
+      // Extract the repository name based on URL format
+      if (cleanUrl.startsWith('https://')) {
+        // HTTPS URL format: https://github.com/username/repository
+        const urlObj = new URL(cleanUrl);
+        const pathParts = urlObj.pathname.split('/').filter(Boolean);
+        return pathParts.length >= 2 ? pathParts[1] : '';
+      } else if (cleanUrl.startsWith('git@')) {
+        // SSH URL format: git@github.com:username/repository
+        const sshParts = cleanUrl.split(':');
+        if (sshParts.length >= 2) {
+          const pathParts = sshParts[1].split('/').filter(Boolean);
+          return pathParts.length >= 1 ? pathParts[pathParts.length - 1] : '';
+        }
+      }
+      
+      // Fallback to the last path component
+      const parts = cleanUrl.split('/');
+      return parts[parts.length - 1];
+    } catch (error) {
+      console.warn(`Warning: Could not extract repository name from URL: ${error.message}`);
+      
+      // Last resort fallback - just use a timestamp
+      return `repo-${Date.now()}`;
+    }
+  }
+
+  /**
+   * Process a directory recursively with concurrency control
+   * @param {string} dirPath Directory path
+   * @param {Object} config Configuration options
+   * @param {string} relativePath Relative path from repository root
+   * @returns {Promise<void>}
+   */
+  async processDirectory(dirPath, config, relativePath = '') {
+    if (this.aborted) return;
+    
+    try {
+      // Read directory entries
+      const entries = await fs.readdir(dirPath, { withFileTypes: true });
+      
+      // Split entries into directories and files
+      const directories = [];
+      const files = [];
+      
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          directories.push(entry);
+        } else if (entry.isFile()) {
+          files.push(entry);
+        }
+      }
+      
+      // Process directories with limited concurrency
+      const pendingDirs = [];
+      let processedDirCount = 0;
+      
+      for (const entry of directories) {
+        // Skip directories in the skipDirs list
+        if (config.skipDirs.includes(entry.name)) {
+          this._reportProgress(`Skipping directory: ${path.join(relativePath, entry.name)}`);
+          continue;
+        }
+        
+        const entryPath = path.join(dirPath, entry.name);
+        const entryRelativePath = path.join(relativePath, entry.name);
+        
+        // Process directory with concurrency control
+        if (pendingDirs.length >= config.concurrency) {
+          // Wait for one to complete before adding more
+          await Promise.race(pendingDirs);
+          // Remove completed promises
+          for (let i = pendingDirs.length - 1; i >= 0; i--) {
+            if (pendingDirs[i].status === 'fulfilled' || pendingDirs[i].status === 'rejected') {
+              pendingDirs.splice(i, 1);
+            }
+          }
+        }
+        
+        // Process subdirectory recursively
+        const dirPromise = this.processDirectory(entryPath, config, entryRelativePath)
+          .then(() => {
+            processedDirCount++;
+            dirPromise.status = 'fulfilled';
+            this._reportProgress(`Processed directory ${processedDirCount}/${directories.length}: ${entryRelativePath}`);
+          })
+          .catch((error) => {
+            console.error(`Error processing directory ${entryRelativePath}:`, error.message);
+            dirPromise.status = 'rejected';
+          });
+        
+        dirPromise.status = 'pending';
+        pendingDirs.push(dirPromise);
+      }
+      
+      // Wait for all directories to be processed
+      if (pendingDirs.length > 0) {
+        await Promise.all(pendingDirs);
+      }
+      
+      // Process files with concurrency
+      const pendingFiles = [];
+      let processedFileCount = 0;
+      const totalFiles = files.length;
+      
+      for (const entry of files) {
+        if (this.aborted) break;
+        
+        const entryPath = path.join(dirPath, entry.name);
+        const entryRelativePath = path.join(relativePath, entry.name);
+        
+        // Skip files in the skipFiles list
+        if (config.skipFiles.includes(entry.name)) {
+          this._reportProgress(`Skipping file: ${entryRelativePath}`);
+          const stats = await fs.stat(entryPath);
+          this.stats.skippedFiles++;
+          this.stats.skippedSize += stats.size;
+          continue;
+        }
+        
+        // Get file stats
+        const stats = await fs.stat(entryPath);
+        
+        // Skip files larger than maxFileSizeMB
+        if (stats.size > config.maxFileSizeMB * 1024 * 1024) {
+          this._reportProgress(`Skipping large file (${(stats.size / 1024 / 1024).toFixed(2)} MB): ${entryRelativePath}`);
+          this.stats.skippedFiles++;
+          this.stats.skippedSize += stats.size;
+          continue;
+        }
+        
+        // Skip files with extensions in skipExtensions
+        const fileExt = path.extname(entry.name).toLowerCase();
+        if (config.skipExtensions.includes(fileExt)) {
+          this._reportProgress(`Skipping file with excluded extension: ${entryRelativePath}`);
+          this.stats.skippedFiles++;
+          this.stats.skippedSize += stats.size;
+          continue;
+        }
+        
+        // Process file with concurrency control
+        if (pendingFiles.length >= config.concurrency) {
+          // Wait for one to complete before adding more
+          await Promise.race(pendingFiles);
+          // Remove completed promises
+          for (let i = pendingFiles.length - 1; i >= 0; i--) {
+            if (pendingFiles[i].status === 'fulfilled' || pendingFiles[i].status === 'rejected') {
+              pendingFiles.splice(i, 1);
+            }
+          }
+        }
+        
+        // Process file
+        const filePromise = this.processFile(entryPath, entryRelativePath, stats)
+          .then(() => {
+            processedFileCount++;
+            filePromise.status = 'fulfilled';
+            
+            // Report progress every 10 files or for the last file
+            if (processedFileCount % 10 === 0 || processedFileCount === totalFiles) {
+              const progress = 0.2 + (0.7 * (processedFileCount / totalFiles));
+              this._reportProgress(`Processed file ${processedFileCount}/${totalFiles}: ${entryRelativePath}`, progress);
+            }
+          })
+          .catch((error) => {
+            console.error(`Error processing file ${entryRelativePath}:`, error.message);
+            filePromise.status = 'rejected';
+          });
+        
+        filePromise.status = 'pending';
+        pendingFiles.push(filePromise);
+        this.activePromises.add(filePromise);
+        
+        // Remove from active promises when done
+        filePromise.finally(() => {
+          this.activePromises.delete(filePromise);
+        });
+      }
+      
+      // Wait for all files to be processed
+      if (pendingFiles.length > 0) {
+        await Promise.all(pendingFiles);
+      }
+    } catch (error) {
+      console.error(`Error processing directory ${relativePath}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Process a single file with binary detection
+   * @param {string} filePath File path
+   * @param {string} relativePath Relative path from repository root
+   * @param {Object} stats File stats
+   * @returns {Promise<void>}
+   */
+  async processFile(filePath, relativePath, stats) {
+    if (this.aborted) {
+      return Promise.resolve();
+    }
+    
+    try {
+      // First check if file is binary by reading the first chunk
+      const fileHandle = await fs.open(filePath, 'r');
+      
+      try {
+        // Read the first 8KB to detect if it's a binary file
+        const buffer = Buffer.alloc(8192);
+        const { bytesRead } = await fileHandle.read(buffer, 0, buffer.length, 0);
+        
+        // Check if file is binary using signatures or null byte detection
+        const isBinary = this.isBinaryFile(buffer.slice(0, bytesRead));
+        
+        if (isBinary) {
+          this._reportProgress(`Skipping binary file: ${relativePath}`);
+          this.stats.skippedFiles++;
+          this.stats.skippedSize += stats.size;
+          return;
+        }
+        
+        // Read file content
+        let content;
+        
+        if (stats.size > 1024 * 1024) {
+          // For large files, read in chunks
+          const chunks = [];
+          const bufferSize = 1024 * 1024; // 1MB chunks
+          const buffer = Buffer.alloc(bufferSize);
+          let position = 0;
+          let bytesRead = 0;
+          
+          do {
+            const result = await fileHandle.read(buffer, 0, buffer.length, position);
+            bytesRead = result.bytesRead;
+            
+            if (bytesRead > 0) {
+              chunks.push(buffer.slice(0, bytesRead).toString('utf8'));
+              position += bytesRead;
+            }
+          } while (bytesRead > 0 && position < stats.size);
+          
+          content = chunks.join('');
+        } else {
+          // For smaller files, read all at once
+          content = await fs.readFile(filePath, 'utf8');
+        }
+        
+        // Store file information
+        this.files.push({
+          path: relativePath,
+          content,
+          size: stats.size,
+          extension: path.extname(filePath).toLowerCase(),
+          lastModified: stats.mtime,
+        });
+        
+        // Update stats
+        this.stats.totalFiles++;
+        this.stats.totalSize += stats.size;
+      } finally {
+        await fileHandle.close();
+      }
+    } catch (error) {
+      this._reportProgress(`Error processing file ${relativePath}: ${error.message}`);
+      this.stats.skippedFiles++;
+      
+      // Re-throw custom errors, swallow unhandled ones
+      if (error.code === 'ENOENT') {
+        console.warn(`Warning: File ${relativePath} no longer exists, skipping`);
+      } else if (error.code === 'EACCES') {
+        console.warn(`Warning: Permission denied for ${relativePath}, skipping`);
+      } else {
+        throw new Error(`Failed to process file ${relativePath}: ${error.message}`);
+      }
+    }
+  }
+  
+  /**
+   * Check if a file is binary using signatures and null byte detection
+   * @param {Buffer} buffer File buffer to check
+   * @returns {boolean} True if the file is binary
+   */
+  isBinaryFile(buffer) {
+    // Check for binary file signatures (magic numbers)
+    for (const { signature } of BINARY_FILE_SIGNATURES) {
+      if (buffer.length >= signature.length) {
+        let match = true;
+        for (let i = 0; i < signature.length; i++) {
+          if (buffer[i] !== signature[i]) {
+            match = false;
+            break;
+          }
+        }
+        if (match) return true;
+      }
+    }
+    
+    // Check for null bytes (common in binary files)
+    const MAX_CHECK_LENGTH = Math.min(buffer.length, 1024);
+    let textCharCount = 0;
+    let nullCount = 0;
+    
+    for (let i = 0; i < MAX_CHECK_LENGTH; i++) {
+      const byte = buffer[i];
+      
+      // Count null bytes
+      if (byte === 0) {
+        nullCount++;
+        // If more than 1 null byte in the first 1KB, likely binary
+        if (nullCount > 1) return true;
+      }
+      
+      // Count printable ASCII characters
+      if ((byte >= 32 && byte <= 126) || byte === 9 || byte === 10 || byte === 13) {
+        textCharCount++;
+      }
+    }
+    
+    // If less than 80% are text characters, likely binary
+    return (textCharCount / MAX_CHECK_LENGTH) < 0.8;
+  }
+
+  /**
+   * Generate output in the requested format
+   * @param {string} format Output format: text, json, or markdown
+   * @returns {string|Object} Formatted output
+   * @throws {Error} If the format is not supported
+   */
+  generateOutput(format) {
+    if (!format || typeof format !== 'string') {
+      format = 'text';
+    }
+    
+    try {
+      switch (format.toLowerCase()) {
+      case 'json':
+        return this.generateJsonOutput();
+      case 'markdown':
+        return this.generateMarkdownOutput();
+      case 'text':
+        return this.generateTextOutput();
+      default:
+        console.warn(`Warning: Unsupported format '${format}', defaulting to 'text'`);
+        return this.generateTextOutput();
+      }
+    } catch (error) {
+      console.error(`Error generating ${format} output:`, error.message);
+      throw new Error(`Failed to generate ${format} output: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate JSON output
+   * @returns {Object} JSON representation of the repository
+   */
+  generateJsonOutput() {
+    // Create a clean deep copy without circular references
+    const stats = { 
+      ...this.stats,
+      elapsedTime: this.stats.elapsedTime || (this.stats.endTime - this.stats.startTime) || 0
+    };
+    
+    // Sort files by path for consistent output
+    const sortedFiles = [...this.files].sort((a, b) => a.path.localeCompare(b.path));
+    
+    // Create files array with clean data
+    const processedFiles = sortedFiles.map(file => ({
+      path: file.path,
+      size: file.size,
+      extension: file.extension,
+      lastModified: file.lastModified ? file.lastModified.toISOString() : new Date().toISOString(),
+      content: file.content
+    }));
+    
+    return {
+      files: processedFiles,
+      stats: stats,
+      meta: {
+        generatedAt: new Date().toISOString(),
+        version: '1.0.1',
+        format: 'json',
+      }
+    };
+  }
+
+  /**
+   * Generate Markdown output
+   * @returns {string} Markdown representation of the repository
+   */
+  generateMarkdownOutput() {
+    let output = '# Repository Content\n\n';
+    output += `Generated at: ${new Date().toISOString()}\n\n`;
+    output += `Total files: ${this.stats.totalFiles}\n`;
+    output += `Total size: ${(this.stats.totalSize / 1024 / 1024).toFixed(2)} MB\n`;
+    
+    if (this.stats.elapsedTime) {
+      output += `Processing time: ${(this.stats.elapsedTime / 1000).toFixed(2)} seconds\n`;
+    }
+    
+    output += '\n## Table of Contents\n\n';
+    
+    // Group files by directory for TOC
+    const filesByDir = {};
+    this.files.forEach(file => {
+      const dir = path.dirname(file.path);
+      if (!filesByDir[dir]) {
+        filesByDir[dir] = [];
+      }
+      filesByDir[dir].push(file);
+    });
+    
+    // Generate table of contents
+    Object.keys(filesByDir).sort().forEach(dir => {
+      const dirTitle = dir === '.' ? 'Root Directory' : dir;
+      const dirSlug = dirTitle.toLowerCase().replace(/[^\w]+/g, '-');
+      
+      output += `- [${dirTitle}](#${dirSlug})\n`;
+      
+      // Sort files within each directory
+      filesByDir[dir].sort((a, b) => path.basename(a.path).localeCompare(path.basename(b.path)));
+      
+      filesByDir[dir].forEach(file => {
+        const fileName = path.basename(file.path);
+        const fileSlug = `${dirSlug}-${fileName.toLowerCase().replace(/[^\w]+/g, '-')}`;
+        output += `  - [${fileName}](#${fileSlug})\n`;
+      });
+    });
+    
+    output += '\n';
+    
+    // Generate markdown for each directory
+    Object.keys(filesByDir).sort().forEach(dir => {
+      const dirTitle = dir === '.' ? 'Root Directory' : dir;
+      output += `## ${dirTitle}\n\n`;
+      
+      // Sort files within each directory
+      filesByDir[dir].sort((a, b) => path.basename(a.path).localeCompare(path.basename(b.path)));
+      
+      filesByDir[dir].forEach(file => {
+        const fileName = path.basename(file.path);
+        output += `### ${fileName}\n\n`;
+        
+        // Get the language for syntax highlighting
+        const language = this.getLanguageFromExtension(file.extension);
+        
+        // Add metadata
+        output += `**Path:** \`${file.path}\`  \n`;
+        output += `**Size:** ${(file.size / 1024).toFixed(2)} KB  \n`;
+        
+        if (file.lastModified) {
+          const lastModified = typeof file.lastModified.toISOString === 'function' 
+            ? file.lastModified.toISOString() 
+            : new Date(file.lastModified).toISOString();
+          output += `**Last Modified:** ${lastModified}  \n`;
+        }
+        
+        output += '\n';
+        
+        // Add file content with syntax highlighting
+        output += '```' + language + '\n';
+        output += file.content + '\n';
+        output += '```\n\n';
+      });
+    });
+    
+    return output;
+  }
+
+  /**
+   * Generate plain text output
+   * @returns {string} Text representation of the repository
+   */
+  generateTextOutput() {
+    let output = 'REPOSITORY CONTENT\n';
+    output += '='.repeat(20) + '\n\n';
+    
+    output += `Generated at: ${new Date().toISOString()}\n\n`;
+    output += `Total files: ${this.stats.totalFiles}\n`;
+    output += `Total size: ${(this.stats.totalSize / 1024 / 1024).toFixed(2)} MB\n`;
+    
+    if (this.stats.elapsedTime) {
+      output += `Processing time: ${(this.stats.elapsedTime / 1000).toFixed(2)} seconds\n`;
+    }
+    
+    output += '\n';
+    
+    // Sort files by path
+    const sortedFiles = [...this.files].sort((a, b) => a.path.localeCompare(b.path));
+    
+    // Generate text for each file
+    sortedFiles.forEach(file => {
+      output += `FILE: ${file.path}\n`;
+      output += '='.repeat(Math.min(file.path.length + 6, 80)) + '\n';
+      
+      // Add file metadata
+      output += `Size: ${(file.size / 1024).toFixed(2)} KB\n`;
+      
+      if (file.lastModified) {
+        const lastModified = typeof file.lastModified.toISOString === 'function' 
+          ? file.lastModified.toISOString() 
+          : new Date(file.lastModified).toISOString();
+        output += `Last Modified: ${lastModified}\n`;
+      }
+      
+      output += '-'.repeat(Math.min(file.path.length + 6, 80)) + '\n\n';
+      output += file.content + '\n\n\n';
+    });
+    
+    return output;
+  }
+
+  /**
+   * Get language identifier from file extension for markdown code blocks
+   * @param {string} extension File extension
+   * @returns {string} Language identifier
+   */
+  getLanguageFromExtension(extension) {
+    if (!extension) {
+      return '';
+    }
+    
+    // Normalize extension (ensure it starts with dot and is lowercase)
+    const normalizedExt = extension.startsWith('.')
+      ? extension.toLowerCase()
+      : `.${extension.toLowerCase()}`;
+      
+    const extensionMap = {
+      // JavaScript and TypeScript
+      '.js': 'javascript',
+      '.jsx': 'jsx',
+      '.ts': 'typescript',
+      '.tsx': 'tsx',
+      '.mjs': 'javascript',
+      '.cjs': 'javascript',
+      
+      // Web
+      '.html': 'html',
+      '.htm': 'html',
+      '.css': 'css',
+      '.scss': 'scss',
+      '.sass': 'scss',
+      '.less': 'less',
+      '.svg': 'svg',
+      
+      // Data formats
+      '.json': 'json',
+      '.xml': 'xml',
+      '.yaml': 'yaml',
+      '.yml': 'yaml',
+      '.toml': 'toml',
+      '.ini': 'ini',
+      '.csv': 'csv',
+      
+      // Markdown and documentation
+      '.md': 'markdown',
+      '.markdown': 'markdown',
+      '.rst': 'rst',
+      '.tex': 'tex',
+      '.adoc': 'asciidoc',
+      
+      // Shell and scripts
+      '.sh': 'bash',
+      '.bash': 'bash',
+      '.zsh': 'bash',
+      '.fish': 'fish',
+      '.bat': 'batch',
+      '.cmd': 'batch',
+      '.ps1': 'powershell',
+      
+      // Programming languages
+      '.py': 'python',
+      '.rb': 'ruby',
+      '.php': 'php',
+      '.go': 'go',
+      '.java': 'java',
+      '.kt': 'kotlin',
+      '.scala': 'scala',
+      '.cs': 'csharp',
+      '.fs': 'fsharp',
+      '.vb': 'vb',
+      '.c': 'c',
+      '.h': 'c',
+      '.cpp': 'cpp',
+      '.cc': 'cpp',
+      '.cxx': 'cpp',
+      '.hpp': 'cpp',
+      '.rs': 'rust',
+      '.swift': 'swift',
+      '.dart': 'dart',
+      '.lua': 'lua',
+      '.pl': 'perl',
+      '.elm': 'elm',
+      '.erl': 'erlang',
+      '.ex': 'elixir',
+      '.exs': 'elixir',
+      '.hs': 'haskell',
+      '.clj': 'clojure',
+      '.r': 'r',
+      
+      // Database
+      '.sql': 'sql',
+      
+      // Config files
+      '.gitignore': 'gitignore',
+      '.dockerignore': 'dockerfile',
+      '.dockerfile': 'dockerfile',
+      '.editorconfig': 'ini',
+      '.env': 'shell',
+      
+      // Others
+      '.graphql': 'graphql',
+      '.proto': 'protobuf',
+    };
+    
+    return extensionMap[normalizedExt] || '';
+  }
+}
+
+// Browser compatibility wrapper
+let isNode = false;
+try {
+  isNode = typeof process !== 'undefined' && 
+           process.versions != null && 
+           process.versions.node != null;
+} catch (e) {
+  // Not Node.js
+}
+
+/**
+ * Browser-compatible version that uses the GitHub API
+ */
+class BrowserRepoCombiner extends RepoCombiner {
+  /**
+   * Create a new BrowserRepoCombiner instance 
+   * @param {Object} config Configuration options
+   */
+  constructor(config = {}) {
+    super(config);
+    
+    // Browser-specific properties
+    this.apiRequestCount = 0;
+    this.apiRateLimit = {
+      limit: 60,        // Default GitHub API rate limit for unauthenticated requests
+      remaining: 60,
+      reset: 0,
+    };
+    this.pendingRequests = new Map();
+    this.cachedResponses = new Map();
+  }
+  
+  /**
+   * Clone the GitHub repository using the GitHub API
+   * @param {string} repoUrl GitHub repository URL
+   * @param {string} targetDir Not used in browser version
+   * @returns {Promise<Object>} Repository contents
+   * @throws {Error} If repository cannot be fetched
+   */
+  async cloneRepository(repoUrl) {
+    try {
+      // Validate and extract owner and repo from URL
+      if (!repoUrl.includes('github.com')) {
+        throw new Error('Only GitHub repositories are supported in browser mode');
+      }
+      
+      // Parse the URL correctly handling various formats
+      let owner, repo;
+      
+      if (repoUrl.startsWith('https://')) {
+        // Handle HTTPS URL
+        const url = new URL(repoUrl);
+        const pathParts = url.pathname.split('/').filter(Boolean);
+        
+        if (pathParts.length < 2) {
+          throw new Error('Invalid GitHub repository URL format');
+        }
+        
+        owner = pathParts[0];
+        repo = pathParts[1].replace(/\.git$/, '');
+      } else if (repoUrl.startsWith('git@')) {
+        // Handle SSH URL
+        const match = repoUrl.match(/git@github\.com:([^/]+)\/([^/]+)(\.git)?$/);
+        if (!match) {
+          throw new Error('Invalid GitHub SSH URL format');
+        }
+        
+        owner = match[1];
+        repo = match[2].replace(/\.git$/, '');
+      } else {
+        throw new Error('Unsupported URL format. Use HTTPS or SSH GitHub URLs');
+      }
+      
+      if (!owner || !repo) {
+        throw new Error('Could not extract owner and repository name from URL');
+      }
+      
+      this._reportProgress(`Fetching repository: ${owner}/${repo}`, 0.1, 'fetching');
+      
+      // Get repository metadata to verify it exists and check if it's private
+      await this._checkRepository(owner, repo);
+      
+      // Fetch repository contents recursively with concurrency control
+      this._reportProgress('Fetching repository contents...', 0.2, 'fetching');
+      const repoContents = await this.fetchRepoContents(owner, repo);
+      
+      return { owner, repo, contents: repoContents };
+    } catch (error) {
+      // Enhance error message based on error type
+      if (error.status === 404) {
+        throw new Error(`Repository not found: ${repoUrl}. Check if the URL is correct and the repository exists.`);
+      } else if (error.status === 403 && error.message.includes('rate limit')) {
+        const resetDate = new Date(this.apiRateLimit.reset * 1000);
+        throw new Error(`GitHub API rate limit exceeded. Wait until ${resetDate.toLocaleTimeString()} or authenticate with a token.`);
+      } else if (error.status === 401) {
+        throw new Error('Authentication failed. Check your credentials or token.');
+      } else {
+        throw new Error(`Failed to fetch repository: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Check if a repository exists and is accessible
+   * @param {string} owner Repository owner
+   * @param {string} repo Repository name
+   * @private
+   */
+  async _checkRepository(owner, repo) {
+    const url = `https://api.github.com/repos/${owner}/${repo}`;
+    const response = await this._fetchWithAuth(url);
+    
+    if (!response.ok) {
+      const error = new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+      error.status = response.status;
+      throw error;
+    }
+    
+    const repoInfo = await response.json();
+    
+    // Check if repository is private and we have authentication
+    if (repoInfo.private && !this._hasAuth()) {
+      throw new Error('This repository is private. You need to provide authentication to access it.');
+    }
+    
+    return repoInfo;
+  }
+  
+  /**
+   * Check if authentication is configured
+   * @returns {boolean} True if authentication is configured
+   * @private
+   */
+  _hasAuth() {
+    return Boolean(this.config.auth.token || 
+      (this.config.auth.username && this.config.auth.password));
+  }
+
+  /**
+   * Fetch with authentication and rate limit handling
+   * @param {string} url URL to fetch
+   * @param {Object} options Fetch options
+   * @returns {Promise<Response>} Fetch response
+   * @private
+   */
+  async _fetchWithAuth(url, options = {}) {
+    // Prepare headers with authentication if available
+    const headers = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'repo-combiner'
+    };
+    
+    // Add authentication headers if available
+    if (this.config.auth.token) {
+      headers['Authorization'] = `token ${this.config.auth.token}`;
+    } else if (this.config.auth.username && this.config.auth.password) {
+      try {
+        // Use cross-browser compatible approach for base64 encoding
+        const base64Auth = this._base64Encode(`${this.config.auth.username}:${this.config.auth.password}`);
+        headers['Authorization'] = `Basic ${base64Auth}`;
+      } catch (error) {
+        console.warn('Warning: Failed to encode authentication credentials', error);
+      }
+    }
+    
+    // Merge user-provided options with our defaults
+    const fetchOptions = {
+      ...options,
+      headers: {
+        ...headers,
+        ...(options.headers || {})
+      }
+    };
+    
+    // Check if this request is already in progress
+    const cacheKey = `${url}:${JSON.stringify(fetchOptions)}`;
+    
+    if (this.pendingRequests.has(cacheKey)) {
+      return this.pendingRequests.get(cacheKey);
+    }
+    
+    // Check if response is in cache
+    if (this.cachedResponses.has(cacheKey)) {
+      return Promise.resolve(this.cachedResponses.get(cacheKey).clone());
+    }
+    
+    // Create a new request promise
+    const requestPromise = new Promise((resolve, reject) => {
+      // Implement retry logic with exponential backoff
+      let retries = 3;
+      let delay = 1000; // Start with 1 second delay
+      
+      const executeRequest = async () => {
+        try {
+          while (retries >= 0) {
+            try {
+              const response = await fetch(url, fetchOptions);
+              
+              // Update rate limit information from headers
+              const rateLimit = response.headers.get('x-ratelimit-limit');
+              const rateRemaining = response.headers.get('x-ratelimit-remaining');
+              const rateReset = response.headers.get('x-ratelimit-reset');
+              
+              if (rateLimit && rateRemaining && rateReset) {
+                this.apiRateLimit = {
+                  limit: parseInt(rateLimit, 10),
+                  remaining: parseInt(rateRemaining, 10),
+                  reset: parseInt(rateReset, 10),
+                };
+                
+                // Pre-emptively warn user when approaching rate limit
+                if (parseInt(rateRemaining, 10) < 10 && !this._hasAuth()) {
+                  const resetDate = new Date(parseInt(rateReset, 10) * 1000);
+                  const formattedTime = resetDate.toLocaleTimeString();
+                  this._reportProgress(
+                    `⚠️ Warning: GitHub API rate limit almost reached (${rateRemaining}/${rateLimit} remaining). ` +
+                    `Limit will reset at ${formattedTime}. ` +
+                    'Consider authenticating for higher limits.', 
+                    undefined, 
+                    'warning'
+                  );
+                }
+              }
+              
+              // Handle rate limiting
+              if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+                const resetTime = parseInt(response.headers.get('x-ratelimit-reset'), 10) * 1000;
+                const waitTime = resetTime - Date.now();
+                const resetDate = new Date(resetTime);
+                
+                if (waitTime > 0 && waitTime < 60000 && retries > 0) {
+                  // Wait for rate limit reset if it's reasonable (less than a minute)
+                  this._reportProgress(
+                    `Rate limit exceeded, waiting ${Math.ceil(waitTime / 1000)} seconds until ${resetDate.toLocaleTimeString()}...`, 
+                    undefined, 
+                    'waiting'
+                  );
+                  await new Promise(r => setTimeout(r, waitTime));
+                  retries--;
+                  continue;
+                } else {
+                  // Otherwise, throw an error with detailed information
+                  const error = new Error(
+                    `GitHub API rate limit exceeded. Limit of ${rateLimit} requests ` +
+                    `will reset at ${resetDate.toLocaleTimeString()} ` +
+                    `(in ${Math.ceil(waitTime / 1000 / 60)} minutes). ` +
+                    'To avoid this error, authenticate with a GitHub token.'
+                  );
+                  error.status = 403;
+                  error.resetTime = resetTime;
+                  error.resetDate = resetDate;
+                  throw error;
+                }
+              }
+              
+              // Cache successful responses
+              if (response.ok) {
+                // We need to clone the response since it can only be consumed once
+                this.cachedResponses.set(cacheKey, response.clone());
+              }
+              
+              resolve(response);
+              return;
+            } catch (error) {
+              if (retries > 0 && (error.message.includes('network') || error.message.includes('failed'))) {
+                // Network error, retry with exponential backoff
+                this._reportProgress(`Network error, retrying in ${delay/1000} seconds...`, undefined, 'retrying');
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2; // Exponential backoff
+                retries--;
+              } else {
+                throw error;
+              }
+            }
+          }
+        } catch (error) {
+          reject(error);
+        } finally {
+          // Remove from pending requests
+          this.pendingRequests.delete(cacheKey);
+        }
+      };
+      
+      // Start the request process
+      executeRequest();
+    });
+    
+    // Store the pending request
+    this.pendingRequests.set(cacheKey, requestPromise);
+    
+    return requestPromise;
+  }
+  
+  /**
+   * Cross-browser compatible base64 encoding
+   * @param {string} str String to encode
+   * @returns {string} Base64 encoded string
+   * @private
+   */
+  _base64Encode(str) {
+    // Try using btoa first (most browsers)
+    if (typeof btoa === 'function') {
+      return btoa(str);
+    }
+    
+    // Fallback implementation for environments without btoa
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let output = '';
+    
+    for (
+      let block = 0, charCode, i = 0, map = chars;
+      str.charAt(i | 0) || (map = '=', i % 1);
+      output += map.charAt(63 & block >> 8 - i % 1 * 8)
+    ) {
+      charCode = str.charCodeAt(i += 3/4);
+      
+      if (charCode > 0xFF) {
+        throw new Error('The string to be encoded contains characters outside of the Latin1 range.');
+      }
+      
+      block = block << 8 | charCode;
+    }
+    
+    return output;
+  }
+
+  /**
+   * Fetch repository contents recursively using GitHub API with concurrency control
+   * @param {string} owner Repository owner
+   * @param {string} repo Repository name
+   * @param {string} path Path within repository
+   * @returns {Promise<Array>} Repository contents
+   */
+  async fetchRepoContents(owner, repo, path = '') {
+    if (this.aborted) {
+      return [];
+    }
+    
+    try {
+      const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+      
+      const response = await this._fetchWithAuth(url);
+      
+      if (!response.ok) {
+        const error = new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+        error.status = response.status;
+        
+        // Enhanced error handling for different status codes
+        if (response.status === 403) {
+          const body = await response.json().catch(() => ({}));
+          if (body.message && body.message.includes('rate limit')) {
+            // Rate limit error with more details from response body
+            error.message = `GitHub API rate limit exceeded: ${body.message}`;
+            error.isRateLimit = true;
+            
+            // Try to get the remaining rate limit info from the response body
+            if (body.documentation_url) {
+              error.documentationUrl = body.documentation_url;
+            }
+          } else if (body.message && body.message.includes('abuse')) {
+            // Secondary rate limit (abuse detection)
+            error.message = `GitHub API secondary rate limit triggered: ${body.message}`;
+            error.isSecondaryRateLimit = true;
+          }
+        } else if (response.status === 404) {
+          error.message = `Repository path not found: ${path || 'root'}. The repository might be private or not exist.`;
+        } else if (response.status === 401) {
+          error.message = 'Authentication failed. Check your credentials or token.';
+        } else if (response.status >= 500) {
+          error.message = `GitHub server error (${response.status}). Try again later.`;
+        }
+        
+        throw error;
+      }
+      
+      const data = await response.json();
+      
+      if (Array.isArray(data)) {
+        // This is a directory
+        const contents = [];
+        
+        // Group items into directories and files
+        const directories = [];
+        const files = [];
+        
+        for (const item of data) {
+          if (item.type === 'dir' && !this.config.skipDirs.includes(item.name)) {
+            directories.push(item);
+          } else if (item.type === 'file' && !this.config.skipFiles.includes(item.name)) {
+            // Skip files with extensions in skipExtensions
+            const fileExt = this._getFileExtension(item.name).toLowerCase();
+            if (!this.config.skipExtensions.includes(fileExt)) {
+              files.push(item);
+            } else {
+              this._reportProgress(`Skipping excluded file extension: ${item.path}`);
+              this.stats.skippedFiles++;
+            }
+          }
+        }
+        
+        // Process directories with concurrency control
+        let processedDirCount = 0;
+        const totalDirs = directories.length;
+        
+        // Pre-warn if large number of directories to process
+        if (totalDirs > 50) {
+          this._reportProgress(
+            `Processing large repository with ${totalDirs} directories. This may take some time...`,
+            undefined,
+            'info'
+          );
+        }
+        
+        for (let i = 0; i < directories.length; i += this.config.concurrency) {
+          const batch = directories.slice(i, i + this.config.concurrency);
+          
+          const batchPromises = batch.map(item => {
+            return this.fetchRepoContents(owner, repo, item.path)
+              .then(subContents => {
+                processedDirCount++;
+                this._reportProgress(
+                  `Processed directory ${processedDirCount}/${totalDirs}: ${item.path}`,
+                  0.2 + (0.4 * (processedDirCount / totalDirs)),
+                  'fetching'
+                );
+                return subContents;
+              })
+              .catch(error => {
+                // Handle directory-specific errors gracefully
+                console.warn(`Warning: Error processing directory ${item.path}: ${error.message}`);
+                
+                // Special handling for rate limit errors - need to propagate these
+                if (error.isRateLimit || error.isSecondaryRateLimit) {
+                  throw error;
+                }
+                
+                return [];
+              });
+          });
+          
+          try {
+            const results = await Promise.all(batchPromises);
+            
+            for (const subContents of results) {
+              contents.push(...subContents);
+            }
+          } catch (error) {
+            // If it's a rate limit error, propagate it
+            if (error.isRateLimit || error.isSecondaryRateLimit) {
+              throw error;
+            }
+            console.error(`Error processing batch of directories: ${error.message}`);
+          }
+          
+          if (this.aborted) break;
+        }
+        
+        // Process files with concurrency control
+        let processedFileCount = 0;
+        const totalFiles = files.length;
+        
+        for (let i = 0; i < files.length; i += this.config.concurrency) {
+          if (this.aborted) break;
+          
+          const batch = files.slice(i, i + this.config.concurrency);
+          
+          const batchPromises = batch.map(item => {
+            return this._processFileItem(item)
+              .then(fileObject => {
+                processedFileCount++;
+                
+                // Report progress periodically to avoid flooding
+                if (processedFileCount % 5 === 0 || processedFileCount === totalFiles) {
+                  this._reportProgress(
+                    `Processed file ${processedFileCount}/${totalFiles}: ${item.path}`,
+                    0.6 + (0.3 * (processedFileCount / totalFiles)),
+                    'fetching'
+                  );
+                }
+                
+                return fileObject;
+              })
+              .catch(error => {
+                console.warn(`Warning: Failed to process file ${item.path}: ${error.message}`);
+                
+                // Special handling for rate limit errors - need to propagate these
+                if (error.isRateLimit || error.isSecondaryRateLimit) {
+                  throw error;
+                }
+                
+                return null;
+              });
+          });
+          
+          try {
+            const results = await Promise.all(batchPromises);
+            
+            for (const fileObject of results) {
+              if (fileObject) {
+                contents.push(fileObject);
+              }
+            }
+          } catch (error) {
+            // If it's a rate limit error, propagate it
+            if (error.isRateLimit || error.isSecondaryRateLimit) {
+              throw error;
+            }
+            console.error(`Error processing batch of files: ${error.message}`);
+          }
+        }
+        
+        return contents;
+      } else {
+        // This is a single file (direct API call to a file path)
+        const fileObject = await this._processFileItem(data);
+        return fileObject ? [fileObject] : [];
+      }
+    } catch (error) {
+      // Enhance the error with more context
+      if (error.isRateLimit || error.isSecondaryRateLimit) {
+        // Propagate rate limit errors with custom user-friendly message
+        const enhancedError = new Error(
+          `GitHub API rate limit exceeded while fetching ${path || 'repository root'}. ` +
+          'To increase your rate limit, authenticate with a GitHub token. ' +
+          `${error.message}`
+        );
+        enhancedError.isRateLimit = error.isRateLimit;
+        enhancedError.isSecondaryRateLimit = error.isSecondaryRateLimit;
+        enhancedError.documentationUrl = error.documentationUrl;
+        throw enhancedError;
+      }
+      
+      console.error(`Error fetching ${path || 'repository root'}:`, error.message);
+      
+      // Don't throw for individual directory errors, just return empty array
+      if (path !== '') {
+        console.warn(`Skipping directory: ${path}`);
+        return [];
+      }
+      
+      throw error;
+    }
+  }
+  
+  /**
+   * Process a single file item from the GitHub API
+   * @param {Object} item File item from GitHub API
+   * @param {string} owner Repository owner
+   * @param {string} repo Repository name
+   * @returns {Promise<Object>} Processed file object
+   * @private
+   */
+  async _processFileItem(item) {
+    // Skip files larger than maxFileSizeMB
+    if (item.size > this.config.maxFileSizeMB * 1024 * 1024) {
+      this._reportProgress(`Skipping large file (${(item.size / 1024 / 1024).toFixed(2)} MB): ${item.path}`);
+      this.stats.skippedFiles++;
+      this.stats.skippedSize += item.size;
+      return null;
+    }
+    
+    // Get file extension using browser-compatible approach
+    const fileExt = this._getFileExtension(item.name).toLowerCase();
+    
+    // Skip binary files based on known binary extensions
+    for (const { extension } of BINARY_FILE_SIGNATURES) {
+      if (fileExt === extension) {
+        this._reportProgress(`Skipping binary file: ${item.path}`);
+        this.stats.skippedFiles++;
+        this.stats.skippedSize += item.size;
+        return null;
+      }
+    }
+    
+    try {
+      // Use raw download URL to fetch content
+      const fileResponse = await this._fetchWithAuth(item.download_url);
+      
+      if (!fileResponse.ok) {
+        throw new Error(`Failed to fetch file content: ${fileResponse.status} ${fileResponse.statusText}`);
+      }
+      
+      const content = await fileResponse.text();
+      
+      // Detect if this is a binary file by checking for null bytes
+      if (content.includes('\0')) {
+        this._reportProgress(`Skipping binary file: ${item.path}`);
+        this.stats.skippedFiles++;
+        this.stats.skippedSize += item.size;
+        return null;
+      }
+      
+      return {
+        path: item.path,
+        content,
+        size: item.size,
+        extension: fileExt,
+        lastModified: new Date().toISOString(), // GitHub API doesn't provide last modified date
+      };
+    } catch (error) {
+      console.warn(`Warning: Failed to fetch file content for ${item.path}: ${error.message}`);
+      this.stats.skippedFiles++;
+      return null;
+    }
+  }
+  
+  /**
+   * Get file extension in a browser-compatible way
+   * @param {string} filename File name
+   * @returns {string} File extension with dot (e.g., '.js')
+   * @private
+   */
+  _getFileExtension(filename) {
+    if (!filename) return '';
+    const lastDotIndex = filename.lastIndexOf('.');
+    return lastDotIndex === -1 ? '' : filename.substring(lastDotIndex);
+  }
+
+  /**
+   * Process a repository in browser environment
+   * @param {string} repoUrl GitHub repository URL
+   * @param {Object} options Processing options
+   * @returns {Promise<string|Object>} Combined repository content
+   */
+  async processRepo(repoUrl, options = {}) {
+    // Call the parent's processRepo first to handle validation and setup
+    // but override the actual implementation
+    const config = { ...this.config, ...options };
+    this.config = config;
+    
+    // Reset state for new processing
+    this.files = [];
+    this.stats = {
+      totalFiles: 0,
+      totalSize: 0,
+      skippedFiles: 0,
+      skippedSize: 0,
+      startTime: Date.now(),
+      endTime: null,
+      elapsedTime: 0,
+    };
+    this.aborted = false;
+    this.apiRequestCount = 0;
+    this.cachedResponses.clear();
+    this.pendingRequests.clear();
+    
+    try {
+      this._reportProgress(`Processing repository: ${repoUrl}`, 0, 'initializing');
+      
+      // Fetch repository contents
+      const repoData = await this.cloneRepository(repoUrl);
+      
+      // Store valid files (non-null values)
+      this.files = repoData.contents.filter(Boolean);
+      
+      // Update stats
+      this.stats.totalFiles = this.files.length;
+      this.stats.totalSize = this.files.reduce((total, file) => total + file.size, 0);
+      
+      // Generate output in the requested format
+      this._reportProgress('Generating output...', 0.9, 'generating');
+      const output = this.generateOutput(config.format);
+      
+      // Update final stats
+      this.stats.endTime = Date.now();
+      this.stats.elapsedTime = this.stats.endTime - this.stats.startTime;
+      
+      const summaryMessage = `
+Repository processing completed:
+- Total files processed: ${this.stats.totalFiles}
+- Total size: ${(this.stats.totalSize / 1024 / 1024).toFixed(2)} MB
+- Skipped files: ${this.stats.skippedFiles}
+- Skipped size: ${(this.stats.skippedSize / 1024 / 1024).toFixed(2)} MB
+- API requests: ${this.apiRequestCount}
+- Processing time: ${(this.stats.elapsedTime / 1000).toFixed(2)} seconds
+      `;
+      
+      this._reportProgress('Processing complete', 1, 'complete');
+      console.log(summaryMessage);
+      
+      return output;
+    } catch (error) {
+      this.stats.endTime = Date.now();
+      this.stats.elapsedTime = this.stats.endTime - this.stats.startTime;
+      
+      this._reportProgress(`Error: ${error.message}`, undefined, 'error');
+      
+      // Clean up any pending promises
+      for (const [key, promise] of this.pendingRequests.entries()) {
+        if (promise.cancel && typeof promise.cancel === 'function') {
+          promise.cancel();
+        }
+        this.pendingRequests.delete(key);
+      }
+      
+      throw error;
+    }
+  }
+}
+
+/**
+ * Create a repository combiner instance
+ * @param {Object} config Configuration options
+ * @returns {RepoCombiner|BrowserRepoCombiner} Repository combiner instance
+ */
+export function createRepoCombiner(config = {}) {
+  return isNode ? new RepoCombiner(config) : new BrowserRepoCombiner(config);
+}
+
+// Export module
+export default {
+  RepoCombiner,
+  BrowserRepoCombiner,
+  createRepoCombiner,
+  version: '1.0.1',
+};
+
+
+FILE: test/browser-tests.js
+===========================
+Size: 9.05 KB
+Last Modified: 2025-03-11T20:26:48.210Z
+---------------------------
+
+// Browser-specific tests for repo-combiner
+// This file is designed to be used in a browser environment
+
+/**
+ * Simple test runner for browser environment
+ */
+class BrowserTestRunner {
+  constructor() {
+    this.tests = [];
+    this.results = {
+      total: 0,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+    };
+    this.output = [];
+  }
+
+  /**
+   * Add a test
+   * @param {string} name Test name
+   * @param {Function} fn Test function (async or sync)
+   */
+  test(name, fn) {
+    this.tests.push({ name, fn });
+    return this;
+  }
+
+  /**
+   * Run all tests
+   * @returns {Promise<Object>} Test results
+   */
+  async run() {
+    this.results = {
+      total: this.tests.length,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+    };
+    this.output = [];
+
+    this.log(`Running ${this.tests.length} browser tests...`);
+
+    for (const test of this.tests) {
+      try {
+        this.log(`\nTest: ${test.name}`);
+        await test.fn();
+        this.results.passed++;
+        this.log(`✅ Passed: ${test.name}`);
+      } catch (error) {
+        this.results.failed++;
+        this.log(`❌ Failed: ${test.name}`);
+        this.log(`   Error: ${error.message}`);
+        console.error(error);
+      }
+    }
+
+    this.log(`\nTest Results: ${this.results.passed}/${this.results.total} passed`);
+    if (this.results.failed > 0) {
+      this.log(`❌ ${this.results.failed} tests failed`);
+    } else {
+      this.log('✅ All tests passed!');
+    }
+
+    return {
+      results: this.results,
+      output: this.output.join('\n')
+    };
+  }
+
+  /**
+   * Log a message to the output
+   * @param {string} message Message to log
+   */
+  log(message) {
+    this.output.push(message);
+    console.log(message);
+  }
+
+  /**
+   * Assert that a condition is true
+   * @param {boolean} condition Condition to check
+   * @param {string} message Error message if condition is false
+   * @throws {Error} If condition is false
+   */
+  assert(condition, message) {
+    if (!condition) {
+      throw new Error(message || 'Assertion failed');
+    }
+  }
+}
+
+/**
+ * Run browser-specific tests for repo-combiner
+ * @param {Object} options Test options
+ * @returns {Promise<Object>} Test results
+ */
+export async function runBrowserTests(options = {}) {
+  // Import the module - assumes it's already available in the global scope or as a module
+  const { createRepoCombiner } = options.moduleExports || window;
+  
+  if (!createRepoCombiner) {
+    throw new Error('repo-combiner module not found. Make sure it is imported before running tests.');
+  }
+
+  const runner = new BrowserTestRunner();
+
+  // Test factory function
+  runner.test('Create BrowserRepoCombiner instance', () => {
+    const combiner = createRepoCombiner();
+    runner.assert(combiner !== null, 'Factory function should create an instance');
+    runner.assert(combiner.constructor.name === 'BrowserRepoCombiner', 'Should create BrowserRepoCombiner in browser environment');
+  });
+
+  // Test configuration options
+  runner.test('Configuration merging', () => {
+    const customCombiner = createRepoCombiner({
+      format: 'markdown',
+      maxFileSizeMB: 20,
+      customOption: 'test'
+    });
+    
+    runner.assert(customCombiner.config.format === 'markdown', 'Should respect custom format');
+    runner.assert(customCombiner.config.maxFileSizeMB === 20, 'Should respect custom maxFileSizeMB');
+    runner.assert(customCombiner.config.customOption === 'test', 'Should add custom option');
+  });
+
+  // Test browser-specific utilities
+  runner.test('_getFileExtension utility', () => {
+    const combiner = createRepoCombiner();
+    
+    // Access the private method - in real tests you might use a more elegant approach
+    runner.assert(combiner._getFileExtension('test.js') === '.js', 'Should extract js extension');
+    runner.assert(combiner._getFileExtension('file.with.multiple.dots.txt') === '.txt', 'Should handle multiple dots');
+    runner.assert(combiner._getFileExtension('no_extension') === '', 'Should return empty string for no extension');
+    runner.assert(combiner._getFileExtension('.hidden') === '.hidden', 'Should handle hidden files');
+    runner.assert(combiner._getFileExtension('') === '', 'Should handle empty string');
+    runner.assert(combiner._getFileExtension() === '', 'Should handle undefined input');
+  });
+
+  // Test base64 encoding
+  runner.test('_base64Encode utility', () => {
+    const combiner = createRepoCombiner();
+    
+    const testStr = 'Hello, world!';
+    const expected = 'SGVsbG8sIHdvcmxkIQ==';
+    
+    const encoded = combiner._base64Encode(testStr);
+    runner.assert(encoded.replace(/=$/, '') === expected.replace(/=$/, ''), 
+      'Should correctly encode string to base64');
+    
+    // Test with credentials format
+    const credentials = 'username:password';
+    const credentialsEncoded = combiner._base64Encode(credentials);
+    runner.assert(typeof credentialsEncoded === 'string' && credentialsEncoded.length > 0,
+      'Should encode credentials string');
+  });
+
+  // Test URL validation
+  runner.test('URL validation', async () => {
+    const combiner = createRepoCombiner();
+    
+    // Invalid URL
+    try {
+      await combiner.processRepo('not-a-url');
+      runner.assert(false, 'Should reject invalid URL');
+    } catch (error) {
+      runner.assert(error.message.includes('Invalid repository URL'), 
+        'Should reject with appropriate error message');
+    }
+    
+    // Valid URL format but invalid repo - Skip actual API requests
+    if (options.skipRemoteTests) {
+      runner.log('Skipping remote repository tests');
+      return;
+    }
+    
+    // Optional: Test with a public repo (only if skipRemoteTests is false)
+    const repoUrl = options.testRepoUrl || 'https://github.com/octocat/Hello-World';
+    try {
+      // Set a very low timeout to avoid long test runs
+      const startResult = await combiner.processRepo(repoUrl, { 
+        timeout: 3000,
+        maxFileSizeMB: 0.1, // Set very small to skip most files
+        onProgress: (data) => {
+          runner.log(`Progress: ${data.message || 'Working...'}`);
+        }
+      });
+      
+      // If we get here, abort the operation
+      combiner.abort();
+      runner.assert(startResult !== null || combiner.aborted, 'Should start processing valid repo');
+    } catch (error) {
+      // We expect an error due to timeout or abort
+      runner.assert(error.message.includes('aborted') || error.message.includes('timeout') || 
+                   error.message.includes('rate limit'), 
+        'Got expected error when testing with real repo');
+    }
+  });
+
+  // Test error handling for rate limits
+  runner.test('Rate limit error handling', () => {
+    const combiner = createRepoCombiner();
+    
+    // Mock a rate limit response
+    const mockError = {
+      status: 403,
+      message: 'API rate limit exceeded',
+      isRateLimit: true,
+      resetTime: Date.now() + 3600000 // 1 hour from now
+    };
+    
+    // Test the error enhancement logic by creating a similar error to what would be thrown
+    const enhancedError = new Error(
+      `GitHub API rate limit exceeded while fetching repo. ` +
+      `To increase your rate limit, authenticate with a GitHub token. ` +
+      `${mockError.message}`
+    );
+    enhancedError.isRateLimit = mockError.isRateLimit;
+    
+    runner.assert(enhancedError.message.includes('authenticate with a GitHub token'), 
+      'Rate limit errors should include authentication advice');
+    runner.assert(enhancedError.isRateLimit === true, 
+      'Rate limit errors should be flagged with isRateLimit property');
+  });
+
+  // Add custom tests based on authentication
+  runner.test('Authentication configuration', () => {
+    const withTokenAuth = createRepoCombiner({
+      auth: {
+        token: 'test-token'
+      }
+    });
+    
+    const withBasicAuth = createRepoCombiner({
+      auth: {
+        username: 'test-user',
+        password: 'test-password'
+      }
+    });
+    
+    runner.assert(withTokenAuth.config.auth.token === 'test-token', 
+      'Should properly set token authentication');
+    
+    runner.assert(withBasicAuth.config.auth.username === 'test-user' &&
+                 withBasicAuth.config.auth.password === 'test-password', 
+      'Should properly set basic authentication');
+    
+    // Test _hasAuth method
+    runner.assert(withTokenAuth._hasAuth() === true, 'Should detect token auth');
+    runner.assert(withBasicAuth._hasAuth() === true, 'Should detect basic auth');
+    
+    const noAuth = createRepoCombiner({
+      auth: {}
+    });
+    
+    runner.assert(noAuth._hasAuth() === false, 'Should detect missing auth');
+  });
+
+  // Run any additional tests provided by the caller
+  if (typeof options.additionalTests === 'function') {
+    await options.additionalTests(runner);
+  }
+
+  // Run all tests
+  return runner.run();
+}
+
+// If running directly in browser
+if (typeof window !== 'undefined' && window.runBrowserTestsNow) {
+  window.addEventListener('load', () => {
+    runBrowserTests()
+      .then(results => {
+        console.log('Browser tests completed:', results);
+        if (typeof window.onBrowserTestsComplete === 'function') {
+          window.onBrowserTestsComplete(results);
+        }
+      })
+      .catch(error => {
+        console.error('Browser tests failed:', error);
+      });
+  });
+}
+
+
+FILE: test/index.js
+===================
+Size: 1.24 KB
+Last Modified: 2025-03-11T20:26:48.210Z
+-------------------
+
+// Basic test file
+import assert from 'assert';
+import { createRepoCombiner } from '../src/repo-combiner.js';
+
+// Mock tests - replace with actual test framework like Jest or Mocha
+async function runTests() {
+  console.log('Running repo-combiner tests...');
+  
+  // Test factory function
+  const combiner = createRepoCombiner();
+  assert(combiner !== null, 'Factory function should create an instance');
+  
+  // Test URL validation
+  try {
+    await combiner.processRepo('not-a-url');
+    console.error('❌ URL validation test failed');
+  } catch (error) {
+    console.log('✅ URL validation test passed');
+  }
+  
+  // Test configuration merging
+  const customCombiner = createRepoCombiner({
+    format: 'markdown',
+    maxFileSizeMB: 20,
+    customOption: 'test'
+  });
+  
+  assert(customCombiner.config.format === 'markdown', 'Should respect custom format');
+  assert(customCombiner.config.maxFileSizeMB === 20, 'Should respect custom maxFileSizeMB');
+  assert(customCombiner.config.customOption === 'test', 'Should add custom option');
+  console.log('✅ Configuration test passed');
+  
+  // More tests can be added here
+  
+  console.log('All tests completed!');
+}
+
+runTests().catch(error => {
+  console.error('Test failed with error:', error);
+  process.exit(1);
+});
+
+

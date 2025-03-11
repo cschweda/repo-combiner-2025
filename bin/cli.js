@@ -147,11 +147,8 @@ function addDateTimeToFilename(filename) {
  */
 async function ensureDirectoriesExist() {
   // Define the directories that should exist
-  const requiredDirs = [
-    path.join(projectRoot, 'output'),
-    path.join(projectRoot, 'bin', 'output')
-  ];
-  
+  const requiredDirs = [path.join(projectRoot, 'output'), path.join(projectRoot, 'bin', 'output')];
+
   // Create each directory if it doesn't exist
   for (const dir of requiredDirs) {
     try {
@@ -171,7 +168,7 @@ async function ensureDirectoriesExist() {
 async function cli() {
   // Ensure output directories exist before starting
   await ensureDirectoriesExist();
-  
+
   const argv = minimist(process.argv.slice(2), {
     string: ['format', 'output', 'token', 'username', 'password'],
     boolean: ['help', 'version', 'keep-temp'],
@@ -271,6 +268,18 @@ async function cli() {
     console.log('This may take a while for large repositories...');
 
     const output = await repoCombiner.processRepo(repoUrl);
+
+    // Show summary information including line count
+    console.log('\n=== Summary ===');
+    console.log(`- Total files processed: ${repoCombiner.stats.totalFiles}`);
+    console.log(`- Total size: ${(repoCombiner.stats.totalSize / 1024 / 1024).toFixed(2)} MB`);
+
+    // Calculate total lines
+    const totalLines = repoCombiner.files.reduce((sum, file) => sum + (file.lines || 0), 0);
+    console.log(`- Total lines: ${totalLines.toLocaleString()}`);
+
+    console.log(`- Total tokens: ${repoCombiner.stats.totalTokens.toLocaleString()}`);
+    console.log(`- Processing time: ${(repoCombiner.stats.elapsedTime / 1000).toFixed(2)} seconds`);
 
     // Always write output to file
     if (argv.output) {

@@ -24,7 +24,9 @@
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config=jest.config.js test/integration.test.js",
     "postinstall": "node scripts/ensure-directories.js",
     "prepare": "node scripts/ensure-directories.js",
-    "ensure-dirs": "node scripts/ensure-directories.js"
+    "ensure-dirs": "node scripts/ensure-directories.js",
+    "count-lines": "node scripts/count-lines.js",
+    "stats": "node scripts/count-lines.js"
   },
   "keywords": [
     "github",
