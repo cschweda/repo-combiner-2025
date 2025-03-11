@@ -110,25 +110,54 @@ function updateProgress(status) {
   }
 }
 
+// Get token assessment
+function getTokenAssessment(tokenCount) {
+  if (tokenCount < 1000) {
+    return "Very small document, will fit easily in any chat window.";
+  } else if (tokenCount < 4000) {
+    return "Small document, should fit in most chat windows without issues.";
+  } else if (tokenCount < 8000) {
+    return "Medium size document, may approach limits of some basic chat interfaces.";
+  } else if (tokenCount < 16000) {
+    return "Large document, likely exceeds capacity of basic chat interfaces.";
+  } else {
+    return "Very large document, exceeds capacity of most chat interfaces.";
+  }
+}
+
 // Display result based on format
 function displayResult(data, format) {
   // Show output container
   outputContainer.style.display = 'block';
 
+  // Add token assessment if we have JSON data with stats
+  let tokenInfo = '';
+  if (format === 'json' && typeof data === 'object' && data.stats && data.stats.totalTokens) {
+    const tokenCount = data.stats.totalTokens;
+    const assessment = getTokenAssessment(tokenCount);
+    tokenInfo = `
+      <div class="token-assessment">
+        <h3>Token Assessment</h3>
+        <p><strong>Total Tokens:</strong> ${tokenCount.toLocaleString()}</p>
+        <p><strong>Assessment:</strong> ${assessment}</p>
+      </div>
+    `;
+  }
+
   // Display based on format
   if (format === 'json') {
     // JSON format
-    outputElement.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+    outputElement.innerHTML = tokenInfo + `<pre>${JSON.stringify(data, null, 2)}</pre>`;
   } else if (format === 'markdown') {
     // Markdown format using marked.js
     if (window.marked) {
-      outputElement.innerHTML = window.marked.parse(data);
+      outputElement.innerHTML = tokenInfo + window.marked.parse(data);
     } else {
-      outputElement.innerHTML = `<pre>${data}</pre>`;
+      outputElement.innerHTML = tokenInfo + `<pre>${data}</pre>`;
     }
   } else {
     // Text format
-    outputElement.innerHTML = `<pre>${data}</pre>`;
+    outputElement.innerHTML = tokenInfo + `<pre>${data}</pre>`;
   }
 }
 

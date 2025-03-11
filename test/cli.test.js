@@ -1,154 +1,196 @@
 import { jest } from '@jest/globals';
-import path from 'path';
-import fs from 'fs/promises';
-import { fileURLToPath } from 'url';
 import { execFile } from 'child_process';
-import { promisify } from 'util';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const execFileAsync = promisify(execFile);
+// Get the directory path
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.join(__dirname, '..');
-const cliPath = path.join(projectRoot, 'bin', 'cli.js');
-const outputDir = path.join(projectRoot, 'output');
+const cliPath = path.join(__dirname, '../bin/cli.js');
+const testOutputDir = path.join(__dirname, '../test-output');
 
-// Mock repo-combiner module
+// Create a mock module for repo-combiner.js
 jest.mock('../src/repo-combiner.js', () => {
-  const mockProcessRepo = jest.fn().mockImplementation(() => {
-    return Promise.resolve('Mock repository content');
-  });
+  const mockStats = {
+    totalFiles: 10,
+    totalSize: 1024 * 500,
+    elapsedTime: 1200,
+    totalTokens: 15000,
+  };
+
+  const mockFiles = [{ path: 'file1.js', content: 'console.log("Hello");', lines: 1 }];
+
+  const mockInstance = {
+    processRepo: jest.fn(async (url, options = {}) => {
+      if (url === 'https://github.com/error/repo') {
+        throw new Error('Mock repository processing error');
+      }
+
+      if (url === 'https://github.com/rate-limit/repo') {
+        throw new Error('API rate limit exceeded for your IP (60 requests per hour)');
+      }
+
+      if (
+        url === 'https://github.com/auth-error/repo' ||
+        options?.auth?.token === 'invalid-token'
+      ) {
+        throw new Error('Authentication failed. Please check your credentials.');
+      }
+
+      if (url === 'https://github.com/not-found/repo') {
+        throw new Error('Repository not found');
+      }
+
+      // Format-specific mock responses
+      const format = options?.format || 'text';
+
+      // Simulate successful processing
+      mockInstance.stats = { ...mockStats };
+      mockInstance.files = [...mockFiles];
+
+      if (format === 'json') {
+        return {
+          repository: url,
+          stats: mockStats,
+          files: mockFiles,
+        };
+      } else if (format === 'markdown') {
+        return `# Repository ${url}\n\n## File: file1.js\n\n\`\`\`javascript\nconsole.log("Hello");\n\`\`\``;
+      } else {
+        return `Repository: ${url}\n\n--- file1.js ---\nconsole.log("Hello");\n`;
+      }
+    }),
+    stats: { ...mockStats },
+    files: [...mockFiles],
+  };
 
   return {
-    createRepoCombiner: jest.fn().mockImplementation(() => {
-      return {
-        processRepo: mockProcessRepo,
-      };
-    }),
+    createRepoCombiner: jest.fn(() => mockInstance),
+    __mockInstance: mockInstance,
   };
 });
 
-describe('CLI Tests', () => {
-  beforeEach(async () => {
-    // Clean up output directory before tests
-    try {
-      const files = await fs.readdir(outputDir);
-      await Promise.all(
-        files
-          .filter(file => file.match(/^test_output_/))
-          .map(file => fs.unlink(path.join(outputDir, file)))
-      );
-    } catch (err) {
-      if (err.code !== 'ENOENT') {
-        throw err;
+// Helper function to run CLI commands
+function runCli(args = '') {
+  return new Promise((resolve, reject) => {
+    // Use execFile to run the CLI script
+    execFile(
+      process.execPath,
+      [cliPath, ...args.split(' ').filter(Boolean)],
+      { env: { ...process.env, NODE_ENV: 'test' } },
+      (error, stdout, stderr) => {
+        resolve({ stdout, stderr, error });
       }
-    }
-
-    // Reset mocks
-    jest.clearAllMocks();
+    );
   });
+}
 
-  test('should display help when --help flag is provided', async () => {
-    const { stdout } = await execFileAsync('node', [cliPath, '--help']);
+// Clean up test files before tests
+beforeEach(async () => {
+  try {
+    // Ensure test output directory exists
+    await fs.mkdir(testOutputDir, { recursive: true });
+
+    // Clean any previous test files
+    const files = await fs.readdir(testOutputDir);
+    await Promise.all(
+      files
+        .filter(file => file !== '.gitkeep')
+        .map(file => fs.unlink(path.join(testOutputDir, file)))
+    );
+  } catch (err) {
+    console.error('Error in test setup:', err);
+  }
+
+  // Reset the jest mocks
+  jest.clearAllMocks();
+});
+
+describe('CLI Basic Tests', () => {
+  // Basic functionality tests
+  test('displays help when --help flag is used', async () => {
+    const { stdout } = await runCli('--help');
     expect(stdout).toContain('Usage: repo-combiner [options] <repository-url>');
-    expect(stdout).toContain('-h, --help');
-    expect(stdout).toContain('-v, --version');
-    expect(stdout).toContain('-f, --format');
+    expect(stdout).toContain('-f, --format <type>');
+    expect(stdout).toContain('-o, --output');
   });
 
-  test('should display version when --version flag is provided', async () => {
-    const { stdout } = await execFileAsync('node', [cliPath, '--version']);
+  test('displays version when --version flag is used', async () => {
+    const { stdout } = await runCli('--version');
     expect(stdout).toMatch(/repo-combiner v\d+\.\d+\.\d+/);
   });
 
-  test('should use text format by default', async () => {
-    try {
-      const { stdout } = await execFileAsync('node', [
-        cliPath,
-        'https://github.com/user/repo',
-        '--output',
-        'test_output_default',
-      ]);
-      // If the command succeeds, we verify expected output
-      expect(stdout).toContain('Output format: text');
-    } catch (error) {
-      // If the command fails due to repository issues, we still verify format was set correctly
-      expect(error.stdout).toContain('Output format: text');
-    }
-  });
-
-  test('should use markdown format when specified', async () => {
-    try {
-      const { stdout } = await execFileAsync('node', [
-        cliPath,
-        'https://github.com/user/repo',
-        '--format',
-        'markdown',
-        '--output',
-        'test_output_md',
-      ]);
-      
-      expect(stdout).toContain('Output format: markdown');
-      expect(stdout).toContain('.md');
-    } catch (error) {
-      expect(error.stdout).toContain('Output format: markdown');
-      // Don't check for .md since it may not be shown if there's an error
-    }
-  });
-
-  test('should use JSON format when specified', async () => {
-    try {
-      const { stdout } = await execFileAsync('node', [
-        cliPath,
-        'https://github.com/user/repo',
-        '--format',
-        'json',
-        '--output',
-        'test_output_json',
-      ]);
-  
-      expect(stdout).toContain('Output format: json');
-      expect(stdout).toContain('.json');
-    } catch (error) {
-      expect(error.stdout).toContain('Output format: json');
-      // Don't check for .json since it may not be shown if there's an error
-    }
-  });
-
-  test('should reject invalid repository URLs', async () => {
-    const { stderr } = await execFileAsync('node', [cliPath, 'invalid-repo-url', '--output', 'test_output_invalid']);
+  test('shows error for invalid repository URL', async () => {
+    const { stderr } = await runCli('not-a-valid-url');
     expect(stderr).toContain('Invalid repository URL format');
   });
+});
 
-  test('should use project root for output paths', async () => {
-    try {
-      const { stdout } = await execFileAsync('node', [
-        cliPath,
-        'https://github.com/user/repo',
-        '--output',
-        'test_output_path',
-      ]);
-  
-      // Should contain path with project root
-      expect(stdout).toContain(path.join(projectRoot));
-    } catch (error) {
-      // If we get an error, relax the check to confirm it's about repository issues
-      expect(error.stdout).toContain('Error');
-    }
+// Separate the more complex processing tests
+// For these we'll use a test repo instead of trying to mock across process boundary
+describe('CLI Processing Tests', () => {
+  test('shows error message for non-existent repository', async () => {
+    const { stderr } = await runCli(
+      'https://github.com/not-a-real-user-123456789/not-a-real-repo-123456789'
+    );
+    expect(stderr).toContain('repository');
   });
 
-  test('should add datetime to filename', async () => {
-    try {
-      const { stdout } = await execFileAsync('node', [
-        cliPath,
-        'https://github.com/user/repo',
-        '--output',
-        'test_output_datetime',
-      ]);
-  
-      // Check that datetime format was added to filename
-      expect(stdout).toMatch(/test_output_datetime_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.txt/);
-    } catch (error) {
-      // If we get an error, just verify we're getting an error about repository issues
-      expect(error.stdout).toContain('Error');
-    }
+  // Jest mock doesn't affect the CLI process, so we can't assert on mocks working across processes
+  test('handles format validation', async () => {
+    const { stderr } = await runCli('--format invalid-format https://github.com/test/repo');
+    expect(stderr).toContain('Invalid format');
+    expect(stderr).toContain('Valid formats are: text, markdown, json');
   });
+});
+
+// Output file testing using a real public repository
+describe('CLI Output File Tests', () => {
+  const PUBLIC_TEST_REPO = 'https://github.com/expressjs/express';
+  const OUTPUT_TIMEOUT = 30000; // 30 seconds for larger repo tests
+
+  // These tests work with real repositories and may take longer
+  test(
+    'saves output to a specified file',
+    async () => {
+      // Use absolute path for test output
+      const outputBase = path.resolve(testOutputDir, 'test-output');
+
+      // Run the CLI with a small, public test repository
+      const { stdout, stderr } = await runCli(`-o ${outputBase} ${PUBLIC_TEST_REPO}`);
+      
+      if (stderr) console.error('CLI ERROR:', stderr);
+      
+      // Check that a file was created with the expected format
+      const files = await fs.readdir(testOutputDir);
+      console.log('Files in test output dir:', files);
+      
+      const outputFile = files.find(
+        file => file.startsWith('test-output_') && file.endsWith('.txt')
+      );
+
+      expect(outputFile).toBeTruthy();
+    },
+    OUTPUT_TIMEOUT
+  );
+
+  test(
+    'uses correct extension based on format',
+    async () => {
+      // Test with JSON format
+      const jsonOutputPath = path.resolve(testOutputDir, 'json-test');
+      const { stdout, stderr } = await runCli(`-f json -o ${jsonOutputPath} ${PUBLIC_TEST_REPO}`);
+      
+      if (stderr) console.error('CLI ERROR:', stderr);
+      
+      // Check that a file was created with the expected format
+      const files = await fs.readdir(testOutputDir);
+      console.log('Files in test output dir for JSON test:', files);
+      
+      const jsonFile = files.find(file => file.startsWith('json-test_') && file.endsWith('.json'));
+
+      expect(jsonFile).toBeTruthy();
+    },
+    OUTPUT_TIMEOUT
+  );
 });

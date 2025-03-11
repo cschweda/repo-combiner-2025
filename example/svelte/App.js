@@ -160,15 +160,43 @@ export default function App(options) {
     }
   }
 
+  function getTokenAssessment(tokenCount) {
+    if (tokenCount < 1000) {
+      return "Very small document, will fit easily in any chat window.";
+    } else if (tokenCount < 4000) {
+      return "Small document, should fit in most chat windows without issues.";
+    } else if (tokenCount < 8000) {
+      return "Medium size document, may approach limits of some basic chat interfaces.";
+    } else if (tokenCount < 16000) {
+      return "Large document, likely exceeds capacity of basic chat interfaces.";
+    } else {
+      return "Very large document, exceeds capacity of most chat interfaces.";
+    }
+  }
+
   function getFormattedResult() {
     if (!result) return '';
+    
+    // Get token assessment if we have it
+    let tokenInfo = '';
+    if (format === 'json' && typeof result === 'object' && result.stats && result.stats.totalTokens) {
+      const tokenCount = result.stats.totalTokens;
+      const assessment = getTokenAssessment(tokenCount);
+      tokenInfo = `
+        <div class="token-assessment">
+          <h3>Token Assessment</h3>
+          <p><strong>Total Tokens:</strong> ${tokenCount.toLocaleString()}</p>
+          <p><strong>Assessment:</strong> ${assessment}</p>
+        </div>
+      `;
+    }
 
     if (format === 'json') {
-      return `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+      return tokenInfo + `<pre>${JSON.stringify(result, null, 2)}</pre>`;
     } else if (format === 'markdown' && window.marked) {
-      return window.marked.parse(result);
+      return tokenInfo + window.marked.parse(result);
     } else {
-      return `<pre>${result}</pre>`;
+      return tokenInfo + `<pre>${result}</pre>`;
     }
   }
 

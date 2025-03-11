@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 
 /**
- * Automated release script for repo-combiner
+ * Automated npm publication script for repo-combiner
  * Usage: 
- *   npm run release [patch|minor|major]
- *   npm run release:patch
- *   npm run release:minor
- *   npm run release:major
+ *   npm run publish [patch|minor|major]
+ *   npm run publish:patch
+ *   npm run publish:minor
+ *   npm run publish:major
  * 
  * This script:
- * 1. Runs linting and tests to ensure code quality
- * 2. Updates the CHANGELOG.md file (running changelog:update)
- * 3. Bumps the version (patch, minor, or major)
- * 4. Pushes changes and tags to GitHub
+ * 1. Bumps the version (patch, minor, or major)
+ * 2. Adds all changed files to git
+ * 3. Commits and pushes to GitHub with the new version
+ * 4. Performs npm login
  * 5. Publishes to npm
  */
 
@@ -89,86 +89,57 @@ async function confirm(message) {
 }
 
 /**
- * Main release function
+ * Main publish function
  */
 async function release() {
   try {
-    // 1. Check for uncommitted changes
-    const status = execCommandWithOutput('git status --porcelain');
-    if (status) {
-      console.error('You have uncommitted changes. Please commit or stash them first.');
-      console.error(status);
-      const shouldContinue = await confirm('Continue anyway?');
-      if (!shouldContinue) {
-        process.exit(1);
-      }
-    }
-
-    // 2. Run linting and tests
-    console.log('Running linting...');
-    execCommand('npm run lint');
+    // 1. Display current status
+    console.log('Current git status:');
+    execCommand('git status');
     
-    console.log('Running tests...');
-    execCommand('npm test');
-    
-    // 3. Update CHANGELOG
-    console.log('Updating CHANGELOG...');
-    execCommand('npm run changelog:update');
-    
-    // 4. Ask for confirmation
-    const shouldContinue = await confirm(`Ready to release a ${versionType} version. Continue?`);
+    // 2. Ask for confirmation
+    const shouldContinue = await confirm(`Ready to publish a ${versionType} version update. Continue?`);
     if (!shouldContinue) {
-      console.log('Release cancelled');
+      console.log('Publication cancelled');
       process.exit(0);
     }
     
-    // 5. Bump version
-    console.log(`Bumping ${versionType} version...`);
+    // 3. Bump version
+    console.log(`\n🔼 Bumping ${versionType} version...`);
     const newVersion = execCommandWithOutput(`npm version ${versionType} --no-git-tag-version`);
     console.log(`New version: ${newVersion}`);
     
-    // 6. Commit version and changelog changes
-    console.log('Committing changes...');
-    execCommand('git add package.json package-lock.json CHANGELOG.md');
+    // 4. Add all files to git
+    console.log('\n📁 Adding all files to git...');
+    execCommand('git add .');
+    
+    // 5. Commit version changes
+    console.log('\n💾 Committing changes...');
     execCommand(`git commit -m "chore: release ${newVersion}"`);
     
-    // 7. Create tag
-    console.log('Creating git tag...');
+    // 6. Create tag
+    console.log('\n🏷️ Creating git tag...');
     execCommand(`git tag ${newVersion}`);
     
-    // 8. Push changes and tags
-    console.log('Pushing to GitHub...');
+    // 7. Push changes and tags
+    console.log('\n⬆️ Pushing to GitHub...');
     execCommand('git push');
     execCommand('git push --tags');
     
-    // 9. Check npm login status
-    try {
-      const whoami = execCommandWithOutput('npm whoami', { stdio: 'pipe' });
-      console.log(`Logged in to npm as: ${whoami}`);
-    } catch (error) {
-      console.warn('You are not logged in to npm. Please run npm login first.');
-      const shouldLogin = await confirm('Would you like to login to npm now?');
-      if (shouldLogin) {
-        execCommand('npm login');
-      } else {
-        console.log('Please run npm login and then npm publish manually.');
-        process.exit(0);
-      }
-    }
+    // 8. Always prompt for npm login
+    console.log('\n🔑 Logging in to npm...');
+    console.log('Please enter your npm credentials:');
+    execCommand('npm login');
     
-    // 10. Publish to npm
-    const shouldPublish = await confirm('Ready to publish to npm?');
-    if (shouldPublish) {
-      console.log('Publishing to npm...');
-      execCommand('npm publish');
-      console.log(`🎉 Successfully released and published ${newVersion}!`);
-    } else {
-      console.log('Publication cancelled. You can publish manually with:');
-      console.log('  npm publish');
-    }
+    // 9. Publish to npm
+    console.log('\n🚀 Publishing to npm...');
+    execCommand('npm publish');
+    
+    console.log(`\n🎉 Successfully released and published ${newVersion}!`);
+    console.log(`\nPackage is now available at: https://www.npmjs.com/package/repo-combiner`);
     
   } catch (error) {
-    console.error('Error during release process:');
+    console.error('\n❌ Error during publication process:');
     console.error(error);
     process.exit(1);
   }

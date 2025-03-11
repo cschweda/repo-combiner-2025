@@ -80,7 +80,8 @@ The built-in token counting feature allows you to:
 - Support for large repositories
 - Error handling and progress reporting
 - Support for both private and public repositories
-- Token counting for processed content
+- Token counting with AI-readiness assessment
+- Shows if content will fit in various chat model windows
 
 ## Installation
 
@@ -626,6 +627,28 @@ The automated release script will:
 4. Create a git tag for the new version
 5. Push changes and tags to GitHub
 6. Publish the package to npm
+
+### Quick Publication Script
+
+For a streamlined publication process, you can use the dedicated npm publication script:
+
+```bash
+# For a patch update (1.0.0 -> 1.0.1)
+npm run publish-npm:patch
+
+# For a minor update (1.0.0 -> 1.1.0)
+npm run publish-npm:minor
+
+# For a major update (1.0.0 -> 2.0.0)
+npm run publish-npm:major
+```
+
+This script performs the following steps:
+1. Bumps the version (patch, minor, or major)
+2. Adds all changed files to git
+3. Commits and pushes to GitHub with the new version
+4. Performs npm login 
+5. Publishes to npm
 
 ### Manual Publishing Steps
 

@@ -1,45 +1,40 @@
 #!/usr/bin/env node
 
 /**
- * Script to ensure that required directories exist
- * This helps prevent issues with missing output directories
+ * This script ensures that the required directories exist.
+ * It creates the output and test-output directories if they don't exist.
  */
 
-import fs from 'fs/promises';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Get the project root directory
+// Get current directory in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..');
+
+// Path to project root directory
+const projectRoot = path.join(__dirname, '..');
 
 // Directories to ensure exist
-const requiredDirs = [path.join(projectRoot, 'output'), path.join(projectRoot, 'test', 'fixtures')];
+const directories = [
+  path.join(projectRoot, 'output'),
+  path.join(projectRoot, 'test-output'),
+  path.join(projectRoot, 'bin', 'output')
+];
 
-async function ensureDirectoriesExist() {
-  console.log('Ensuring required directories exist...');
-
-  for (const dir of requiredDirs) {
-    try {
-      await fs.mkdir(dir, { recursive: true });
-      console.log(`✓ Directory exists: ${path.relative(projectRoot, dir)}`);
-    } catch (err) {
-      if (err.code !== 'EEXIST') {
-        console.error(`Error creating directory ${dir}:`, err.message);
-      }
+// Create each directory if it doesn't exist
+for (const dir of directories) {
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`Created directory: ${dir}`);
+    } else {
+      console.log(`Directory already exists: ${dir}`);
     }
+  } catch (error) {
+    console.error(`Error creating directory ${dir}:`, error);
   }
-
-  console.log('Directory check complete.');
 }
 
-// Execute if run directly
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  ensureDirectoriesExist().catch(err => {
-    console.error('Error:', err);
-    process.exit(1);
-  });
-}
-
-export default ensureDirectoriesExist;
+console.log('Directory check complete.');

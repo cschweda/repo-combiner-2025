@@ -106,17 +106,45 @@ export const App = {
   computed: {
     formattedResult() {
       if (!this.result) return '';
+      
+      // Get token assessment if we have it
+      let tokenInfo = '';
+      if (this.format === 'json' && typeof this.result === 'object' && this.result.stats && this.result.stats.totalTokens) {
+        const tokenCount = this.result.stats.totalTokens;
+        const assessment = this.getTokenAssessment(tokenCount);
+        tokenInfo = `
+          <div class="token-assessment">
+            <h3>Token Assessment</h3>
+            <p><strong>Total Tokens:</strong> ${tokenCount.toLocaleString()}</p>
+            <p><strong>Assessment:</strong> ${assessment}</p>
+          </div>
+        `;
+      }
 
       if (this.format === 'json') {
-        return `<pre>${JSON.stringify(this.result, null, 2)}</pre>`;
+        return tokenInfo + `<pre>${JSON.stringify(this.result, null, 2)}</pre>`;
       } else if (this.format === 'markdown' && window.marked) {
-        return window.marked.parse(this.result);
+        return tokenInfo + window.marked.parse(this.result);
       } else {
-        return `<pre>${this.result}</pre>`;
+        return tokenInfo + `<pre>${this.result}</pre>`;
       }
     },
   },
   methods: {
+    getTokenAssessment(tokenCount) {
+      if (tokenCount < 1000) {
+        return "Very small document, will fit easily in any chat window.";
+      } else if (tokenCount < 4000) {
+        return "Small document, should fit in most chat windows without issues.";
+      } else if (tokenCount < 8000) {
+        return "Medium size document, may approach limits of some basic chat interfaces.";
+      } else if (tokenCount < 16000) {
+        return "Large document, likely exceeds capacity of basic chat interfaces.";
+      } else {
+        return "Very large document, exceeds capacity of most chat interfaces.";
+      }
+    },
+    
     async processRepository() {
       if (!this.repoUrl || !this.repoUrl.includes('github.com')) {
         this.errorMsg = 'Please enter a valid GitHub repository URL';

@@ -278,7 +278,25 @@ async function cli() {
     const totalLines = repoCombiner.files.reduce((sum, file) => sum + (file.lines || 0), 0);
     console.log(`- Total lines: ${totalLines.toLocaleString()}`);
 
-    console.log(`- Total tokens: ${repoCombiner.stats.totalTokens.toLocaleString()}`);
+    // Display token count and add an assessment
+    const tokenCount = repoCombiner.stats.totalTokens;
+    console.log(`- Total tokens: ${tokenCount.toLocaleString()}`);
+    
+    // Add token assessment
+    let tokenAssessment = "";
+    if (tokenCount < 1000) {
+      tokenAssessment = "Very small document, will fit easily in any chat window.";
+    } else if (tokenCount < 4000) {
+      tokenAssessment = "Small document, should fit in most chat windows without issues.";
+    } else if (tokenCount < 8000) {
+      tokenAssessment = "Medium size document, may approach limits of some basic chat interfaces.";
+    } else if (tokenCount < 16000) {
+      tokenAssessment = "Large document, likely exceeds capacity of basic chat interfaces.";
+    } else {
+      tokenAssessment = "Very large document, exceeds capacity of most chat interfaces.";
+    }
+    console.log(`- Token assessment: ${tokenAssessment}`);
+    
     console.log(`- Processing time: ${(repoCombiner.stats.elapsedTime / 1000).toFixed(2)} seconds`);
 
     // Always write output to file
@@ -313,6 +331,7 @@ async function cli() {
         if (err.code !== 'EEXIST') throw err;
       }
 
+      // Write the output to file
       await fs.writeFile(
         outputPath,
         typeof output === 'string' ? output : JSON.stringify(output, null, 2)

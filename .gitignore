@@ -144,3 +144,10 @@ dist
 # Output directories
 /output/
 /bin/output/
+
+# Test output files
+/test-output/
+test_*.txt
+test_*.json
+test_*.md
+*_test_output.*
