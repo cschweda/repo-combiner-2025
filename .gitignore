@@ -140,3 +140,7 @@ dist
 
 # Temp files
 .DS_Store
+
+# Output directories
+/output/
+/bin/output/
