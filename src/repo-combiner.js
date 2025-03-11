@@ -87,7 +87,7 @@ class RepoCombiner {
   constructor(config = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.files = [];
-    
+
     // Initialize stats with explicit numeric type for token counters
     this.stats = {
       totalFiles: 0,
@@ -99,12 +99,12 @@ class RepoCombiner {
       endTime: null,
       elapsedTime: 0,
     };
-    
+
     // Validate stats object
     if (typeof this.stats.totalTokens !== 'number') {
       this.stats.totalTokens = 0;
     }
-    
+
     this.aborted = false;
     this.activePromises = new Set();
     this.cacheMap = new Map(); // Cache for expensive operations
@@ -151,26 +151,26 @@ class RepoCombiner {
    */
   _estimateTokenCount(text) {
     if (!text || typeof text !== 'string') return 0;
-    
+
     // Simple tokenization approach based on whitespace and common punctuation
     // This is an approximation; actual LLM tokenizers are more sophisticated
     const cleanText = text
       .replace(/[.,/#!$%^&*;:{}=\-_`~()[\]<>]/g, ' $& ') // Add spaces around punctuation
-      .replace(/\s+/g, ' ')                              // Normalize whitespace
+      .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
-    
+
     // Split on whitespace for a rough token count
     const tokens = cleanText.split(/\s+/);
-    
+
     // For better accuracy - account for the encoding efficiency
     // Most LLM tokenizers use about 4 characters per token on average for English text
     const approximateCharactersPerToken = 4;
     const charCount = text.length;
-    
+
     // Estimate based on raw tokens and character count
     let rawTokenCount = tokens.length;
     let charBasedCount = Math.ceil(charCount / approximateCharactersPerToken);
-    
+
     // Use the average of both approaches, but ensure we have at least 1 token for non-empty text
     const result = Math.max(1, Math.round((rawTokenCount + charBasedCount) / 2));
     return isNaN(result) ? 0 : result;
@@ -283,10 +283,11 @@ class RepoCombiner {
       this.stats.elapsedTime = this.stats.endTime - this.stats.startTime;
 
       // Ensure token count is properly formatted
-      this.stats.totalTokens = typeof this.stats.totalTokens === 'number' && !isNaN(this.stats.totalTokens) 
-        ? this.stats.totalTokens 
-        : 0;
-      
+      this.stats.totalTokens =
+        typeof this.stats.totalTokens === 'number' && !isNaN(this.stats.totalTokens)
+          ? this.stats.totalTokens
+          : 0;
+
       const summaryMessage = `
 Repository processing completed:
 - Total files processed: ${this.stats.totalFiles}
@@ -358,7 +359,7 @@ Repository processing completed:
         try {
           // Use cross-platform git commands with proper quoting
           const gitArgs = ['-C', repoPath, 'pull'];
-          
+
           // Timeout to prevent hanging forever
           execSync(`git ${gitArgs.map(arg => JSON.stringify(arg)).join(' ')}`, {
             stdio: 'pipe',
@@ -373,7 +374,7 @@ Repository processing completed:
           } catch (err) {
             // Ignore errors during cleanup
           }
-          
+
           const cloneArgs = ['clone', '--depth=1', authUrl, repoPath];
           execSync(`git ${cloneArgs.map(arg => JSON.stringify(arg)).join(' ')}`, {
             stdio: 'pipe',
@@ -722,29 +723,33 @@ Repository processing completed:
           content = await fs.readFile(filePath, 'utf8');
         }
 
+        // Count lines in the content
+        const lineCount = this._countLines(content);
+
         // Store file information
         this.files.push({
           path: relativePath,
           content,
           size: stats.size,
+          lines: lineCount, // Add line count
           extension: path.extname(filePath).toLowerCase(),
           lastModified: stats.mtime,
         });
 
         // Calculate approximate token count (rough estimate based on whitespace and punctuation)
         const tokenCount = this._estimateTokenCount(content);
-        
+
         // Make sure tokenCount is a number
         const safeTokenCount = isNaN(tokenCount) ? 0 : Number(tokenCount);
-        
+
         // Store file information
         this.files[this.files.length - 1].tokenCount = safeTokenCount;
-        
+
         // Update stats
         this.stats.totalFiles++;
         this.stats.totalSize += stats.size;
-        
-        // Defensive token counting implementation 
+
+        // Defensive token counting implementation
         if (typeof this.stats.totalTokens !== 'number' || isNaN(this.stats.totalTokens)) {
           this.stats.totalTokens = 0; // Reset if not a valid number
         }
@@ -813,6 +818,17 @@ Repository processing completed:
   }
 
   /**
+   * Count lines in a string
+   * @param {string} text - The text to count lines in
+   * @returns {number} Line count
+   * @private
+   */
+  _countLines(text) {
+    if (!text || typeof text !== 'string') return 0;
+    return text.split('\n').length;
+  }
+
+  /**
    * Generate output in the requested format
    * @param {string} format Output format: text, json, or markdown
    * @returns {string|Object} Formatted output
@@ -852,6 +868,9 @@ Repository processing completed:
       elapsedTime: this.stats.elapsedTime || this.stats.endTime - this.stats.startTime || 0,
     };
 
+    // Calculate total lines
+    const totalLines = this.files.reduce((sum, file) => sum + (file.lines || 0), 0);
+
     // Sort files by path for consistent output
     const sortedFiles = [...this.files].sort((a, b) => a.path.localeCompare(b.path));
 
@@ -859,6 +878,7 @@ Repository processing completed:
     const processedFiles = sortedFiles.map(file => ({
       path: file.path,
       size: file.size,
+      lines: file.lines || 0,
       extension: file.extension,
       lastModified: file.lastModified ? file.lastModified.toISOString() : new Date().toISOString(),
       content: file.content,
@@ -866,12 +886,16 @@ Repository processing completed:
 
     return {
       files: processedFiles,
-      stats: stats,
+      stats: {
+        ...stats,
+        totalLines: totalLines,
+      },
       meta: {
         generatedAt: new Date().toISOString(),
         version: '1.0.1',
         format: 'json',
-        totalTokens: Number(this.stats.totalTokens || 0)
+        totalTokens: Number(this.stats.totalTokens || 0),
+        totalLines: totalLines,
       },
     };
   }
@@ -881,10 +905,14 @@ Repository processing completed:
    * @returns {string} Markdown representation of the repository
    */
   generateMarkdownOutput() {
+    // Calculate total lines
+    const totalLines = this.files.reduce((sum, file) => sum + (file.lines || 0), 0);
+
     let output = '# Repository Content\n\n';
     output += `Generated at: ${new Date().toISOString()}\n\n`;
     output += `Total files: ${this.stats.totalFiles}\n`;
     output += `Total size: ${(this.stats.totalSize / 1024 / 1024).toFixed(2)} MB\n`;
+    output += `Total lines: ${totalLines.toLocaleString()}\n`;
     output += `Total tokens: ${this._formatTokenCount(this.stats.totalTokens)}\n`;
 
     if (this.stats.elapsedTime) {
@@ -944,6 +972,7 @@ Repository processing completed:
           // Add metadata
           output += `**Path:** \`${file.path}\`  \n`;
           output += `**Size:** ${(file.size / 1024).toFixed(2)} KB  \n`;
+          output += `**Lines:** ${(file.lines || 0).toLocaleString()}  \n`;
 
           if (file.lastModified) {
             const lastModified =
@@ -970,12 +999,16 @@ Repository processing completed:
    * @returns {string} Text representation of the repository
    */
   generateTextOutput() {
+    // Calculate total lines
+    const totalLines = this.files.reduce((sum, file) => sum + (file.lines || 0), 0);
+
     let output = 'REPOSITORY CONTENT\n';
     output += '='.repeat(20) + '\n\n';
 
     output += `Generated at: ${new Date().toISOString()}\n\n`;
     output += `Total files: ${this.stats.totalFiles}\n`;
     output += `Total size: ${(this.stats.totalSize / 1024 / 1024).toFixed(2)} MB\n`;
+    output += `Total lines: ${totalLines.toLocaleString()}\n`;
     output += `Total tokens: ${this._formatTokenCount(this.stats.totalTokens)}\n`;
 
     if (this.stats.elapsedTime) {
@@ -994,6 +1027,7 @@ Repository processing completed:
 
       // Add file metadata
       output += `Size: ${(file.size / 1024).toFixed(2)} KB\n`;
+      output += `Lines: ${(file.lines || 0).toLocaleString()}\n`;
 
       if (file.lastModified) {
         const lastModified =
@@ -1125,7 +1159,7 @@ Repository processing completed:
   async saveToFile(output, outputPath) {
     // Normalize path for cross-platform compatibility
     let normalizedPath = path.normalize(outputPath);
-    
+
     // Add datetime to filename
     const actualOutputPath = this._addDateTimeToFilename(normalizedPath);
 
@@ -1767,13 +1801,13 @@ class BrowserRepoCombiner extends RepoCombiner {
       // Calculate token count for browser implementation
       const tokenCount = this._estimateTokenCount(content);
       const safeTokenCount = isNaN(tokenCount) ? 0 : Number(tokenCount);
-      
+
       // Add to total token count - defensively handle possible NaN
       if (typeof this.stats.totalTokens !== 'number' || isNaN(this.stats.totalTokens)) {
         this.stats.totalTokens = 0; // Reset if not a valid number
       }
       this.stats.totalTokens += safeTokenCount;
-      
+
       return {
         path: item.path,
         content,
@@ -1841,7 +1875,10 @@ class BrowserRepoCombiner extends RepoCombiner {
       // Update stats
       this.stats.totalFiles = this.files.length;
       this.stats.totalSize = this.files.reduce((total, file) => total + file.size, 0);
-      this.stats.totalTokens = this.files.reduce((total, file) => total + (file.tokenCount || 0), 0);
+      this.stats.totalTokens = this.files.reduce(
+        (total, file) => total + (file.tokenCount || 0),
+        0
+      );
 
       // Generate output in the requested format
       this._reportProgress('Generating output...', 0.9, 'generating');
