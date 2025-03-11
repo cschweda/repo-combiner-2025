@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Repo Combiner Browser Tests</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1, h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .container {
+      background-color: #f8f9fa;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .test-controls {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.2s;
+      margin: 0 5px;
+    }
+    button:hover {
+      background-color: #0069d9;
+    }
+    button.secondary {
+      background-color: #6c757d;
+    }
+    button.secondary:hover {
+      background-color: #5a6268;
+    }
+    .status {
+      margin: 20px 0;
+      font-size: 16px;
+    }
+    .test-results {
+      display: none;
+      background-color: #f1f3f5;
+      padding: 15px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-top: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .test-summary {
+      margin-top: 15px;
+      font-weight: bold;
+      display: none;
+    }
+    .test-summary.success {
+      color: #28a745;
+    }
+    .test-summary.failure {
+      color: #dc3545;
+    }
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0, 123, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #007bff;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .hidden {
+      display: none;
+    }
+    .options-panel {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #e9ecef;
+      border-radius: 4px;
+    }
+    .checkbox-group {
+      margin-bottom: 10px;
+    }
+    .input-group {
+      margin-bottom: 10px;
+    }
+    label {
+      display: inline-block;
+      margin-right: 10px;
+    }
+    input[type="text"] {
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ced4da;
+      width: 300px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Repo Combiner Browser Tests</h1>
+  
+  <div class="container">
+    <h2>Browser Environment Tests</h2>
+    <p>This page runs tests on the repo-combiner library in a browser environment to verify browser-specific functionality.</p>
+    
+    <div class="test-controls">
+      <button id="runTestsButton">Run All Tests</button>
+      <button id="toggleOptionsButton" class="secondary">Show Options</button>
+    </div>
+
+    <div id="optionsPanel" class="options-panel hidden">
+      <h3>Test Options</h3>
+      
+      <div class="checkbox-group">
+        <input type="checkbox" id="skipRemoteTests" checked>
+        <label for="skipRemoteTests">Skip tests that require GitHub API access</label>
+      </div>
+      
+      <div class="input-group">
+        <label for="testRepoUrl">Test Repository URL (optional):</label>
+        <input type="text" id="testRepoUrl" placeholder="https://github.com/username/repository">
+      </div>
+      
+      <div class="checkbox-group">
+        <input type="checkbox" id="useFallbackEncoding">
+        <label for="useFallbackEncoding">Force use of fallback Base64 encoding</label>
+      </div>
+    </div>
+    
+    <div id="testStatus" class="status">Ready to run tests.</div>
+    
+    <div id="testSummary" class="test-summary"></div>
+    
+    <pre id="testResults" class="test-results"></pre>
+  </div>
+  
+  <script type="module">
+    // Import the repo-combiner module
+    import { createRepoCombiner } from '../src/repo-combiner.js';
+    import { runBrowserTests } from '../test/browser-tests.js';
+    import { initMockGitHubApi, restoreFetch } from './mock-github-api.js';
+    
+    // Elements
+    const runTestsButton = document.getElementById('runTestsButton');
+    const toggleOptionsButton = document.getElementById('toggleOptionsButton');
+    const optionsPanel = document.getElementById('optionsPanel');
+    const testStatus = document.getElementById('testStatus');
+    const testResults = document.getElementById('testResults');
+    const testSummary = document.getElementById('testSummary');
+    const skipRemoteTestsCheckbox = document.getElementById('skipRemoteTests');
+    const testRepoUrlInput = document.getElementById('testRepoUrl');
+    const useFallbackEncodingCheckbox = document.getElementById('useFallbackEncoding');
+    
+    // Add more options to the panel
+    function addMockApiOptions() {
+      const optionsHtml = `
+        <h3>Mock GitHub API Options</h3>
+        <div class="checkbox-group">
+          <input type="checkbox" id="useMockApi" checked>
+          <label for="useMockApi">Use Mock GitHub API (avoid real API calls)</label>
+        </div>
+        
+        <h4>Test Scenarios</h4>
+        <div class="checkbox-group">
+          <input type="checkbox" id="mockRateLimitError">
+          <label for="mockRateLimitError">Simulate Rate Limit Error</label>
+        </div>
+        
+        <div class="checkbox-group">
+          <input type="checkbox" id="mockAuthError">
+          <label for="mockAuthError">Simulate Authentication Error</label>
+        </div>
+        
+        <div class="checkbox-group">
+          <input type="checkbox" id="mockNetworkError">
+          <label for="mockNetworkError">Simulate Network Error</label>
+        </div>
+        
+        <div class="checkbox-group">
+          <input type="checkbox" id="mockRepoNotFound">
+          <label for="mockRepoNotFound">Simulate Repository Not Found</label>
+        </div>
+        
+        <div class="input-group">
+          <label for="remainingRateLimit">Simulated Remaining Rate Limit:</label>
+          <input type="number" id="remainingRateLimit" min="0" max="60" value="10" style="width: 60px;">
+        </div>
+      `;
+      
+      const div = document.createElement('div');
+      div.className = 'mock-api-options';
+      div.innerHTML = optionsHtml;
+      optionsPanel.appendChild(div);
+      
+      // Add event listener to toggle mockable scenarios
+      document.getElementById('useMockApi').addEventListener('change', (e) => {
+        const mockOptions = document.querySelectorAll('.mock-api-options input:not(#useMockApi)');
+        for (const option of mockOptions) {
+          option.disabled = !e.target.checked;
+        }
+      });
+    }
+    
+    // Toggle options panel
+    toggleOptionsButton.addEventListener('click', () => {
+      const isHidden = optionsPanel.classList.contains('hidden');
+      optionsPanel.classList.toggle('hidden', !isHidden);
+      toggleOptionsButton.textContent = isHidden ? 'Hide Options' : 'Show Options';
+    });
+    
+    // Run tests
+    runTestsButton.addEventListener('click', async () => {
+      // Reset UI
+      testStatus.innerHTML = '<div class="spinner"></div> Running tests...';
+      testResults.style.display = 'none';
+      testSummary.style.display = 'none';
+      runTestsButton.disabled = true;
+      
+      try {
+        // Mock btoa if fallback testing is enabled
+        const originalBtoa = window.btoa;
+        if (useFallbackEncodingCheckbox.checked) {
+          window.btoa = null; // Force fallback implementation
+        }
+        
+        // Configure mock GitHub API if enabled
+        if (document.getElementById('useMockApi')?.checked) {
+          initMockGitHubApi({
+            enabled: true,
+            mockRateLimitError: document.getElementById('mockRateLimitError')?.checked || false,
+            mockAuthError: document.getElementById('mockAuthError')?.checked || false,
+            mockNetworkError: document.getElementById('mockNetworkError')?.checked || false,
+            mockRepoNotFound: document.getElementById('mockRepoNotFound')?.checked || false,
+            remainingRateLimit: parseInt(document.getElementById('remainingRateLimit')?.value || '10', 10),
+            resetTime: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+          });
+        } else {
+          // Ensure the original fetch is restored
+          restoreFetch();
+        }
+        
+        // Add additional test for the mock API
+        const mockApiTest = async (runner) => {
+          // Create a test specially for the selected mock scenario
+          if (document.getElementById('mockRateLimitError')?.checked) {
+            runner.test('Mock API - Rate Limit Error Test', async () => {
+              const combiner = createRepoCombiner();
+              try {
+                await combiner.processRepo('https://github.com/mock/repo');
+                runner.assert(false, 'Should throw rate limit error');
+              } catch (error) {
+                runner.assert(
+                  error.message.includes('rate limit') && error.isRateLimit, 
+                  'Should throw rate limit error with correct properties'
+                );
+              }
+            });
+          }
+          
+          if (document.getElementById('mockAuthError')?.checked) {
+            runner.test('Mock API - Authentication Error Test', async () => {
+              const combiner = createRepoCombiner();
+              try {
+                await combiner.processRepo('https://github.com/mock/repo');
+                runner.assert(false, 'Should throw authentication error');
+              } catch (error) {
+                runner.assert(
+                  error.message.includes('Authentication') || error.message.includes('credentials'), 
+                  'Should throw authentication error with correct message'
+                );
+              }
+            });
+          }
+          
+          if (document.getElementById('mockNetworkError')?.checked) {
+            runner.test('Mock API - Network Error Test', async () => {
+              const combiner = createRepoCombiner();
+              try {
+                await combiner.processRepo('https://github.com/mock/repo');
+                runner.assert(false, 'Should throw network error');
+              } catch (error) {
+                runner.assert(
+                  error.message.includes('Network') || error.message.includes('fetch'), 
+                  'Should throw network error with correct message'
+                );
+              }
+            });
+          }
+          
+          if (document.getElementById('mockRepoNotFound')?.checked) {
+            runner.test('Mock API - Repository Not Found Test', async () => {
+              const combiner = createRepoCombiner();
+              try {
+                await combiner.processRepo('https://github.com/mock/repo');
+                runner.assert(false, 'Should throw not found error');
+              } catch (error) {
+                runner.assert(
+                  error.message.includes('not found') || error.status === 404, 
+                  'Should throw not found error with correct message'
+                );
+              }
+            });
+          }
+        };
+        
+        // Run tests with options
+        const results = await runBrowserTests({
+          moduleExports: { createRepoCombiner },
+          skipRemoteTests: skipRemoteTestsCheckbox.checked || document.getElementById('useMockApi')?.checked,
+          testRepoUrl: testRepoUrlInput.value || undefined,
+          additionalTests: mockApiTest
+        });
+        
+        // Restore original btoa if it was mocked
+        if (useFallbackEncodingCheckbox.checked) {
+          window.btoa = originalBtoa;
+        }
+        
+        // Restore original fetch
+        restoreFetch();
+        
+        // Display results
+        testResults.textContent = results.output;
+        testResults.style.display = 'block';
+        
+        // Set summary
+        const { passed, total, failed } = results.results;
+        if (failed === 0) {
+          testSummary.textContent = `All ${passed} tests passed!`;
+          testSummary.className = 'test-summary success';
+        } else {
+          testSummary.textContent = `${failed} of ${total} tests failed.`;
+          testSummary.className = 'test-summary failure';
+        }
+        testSummary.style.display = 'block';
+        
+        // Update status
+        testStatus.innerHTML = 'Tests completed.';
+      } catch (error) {
+        console.error('Error running tests:', error);
+        testStatus.innerHTML = `Error running tests: ${error.message}`;
+        testResults.textContent = error.stack || 'No stack trace available';
+        testResults.style.display = 'block';
+        
+        testSummary.textContent = 'Tests failed to run.';
+        testSummary.className = 'test-summary failure';
+        testSummary.style.display = 'block';
+        
+        // Ensure original fetch is restored
+        restoreFetch();
+      } finally {
+        runTestsButton.disabled = false;
+      }
+    });
+    
+    // Test browser support features
+    function checkBrowserFeatures() {
+      const features = {
+        fetch: typeof fetch !== 'undefined',
+        promise: typeof Promise !== 'undefined',
+        asyncAwait: (async () => {})() instanceof Promise,
+        modules: true, // We're in a module if this code runs
+        btoa: typeof btoa === 'function'
+      };
+      
+      console.log('Browser features:', features);
+      
+      const missingFeatures = Object.entries(features)
+        .filter(([_, supported]) => !supported)
+        .map(([name]) => name);
+      
+      if (missingFeatures.length > 0) {
+        testStatus.innerHTML = `⚠️ Warning: Your browser is missing required features: ${missingFeatures.join(', ')}`;
+      } else {
+        testStatus.innerHTML = '✅ Browser supports all required features.';
+      }
+    }
+    
+    // Add mock API options to the panel
+    addMockApiOptions();
+    
+    // Check browser features on load
+    checkBrowserFeatures();
+  </script>
+</body>
+</html>

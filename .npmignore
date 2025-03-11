@@ -1,0 +1,7 @@
+example/
+test/
+.eslintrc
+.prettierrc
+.gitignore
+.DS_Store
+node_modules/
