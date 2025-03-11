@@ -26,7 +26,11 @@
     "prepare": "node scripts/ensure-directories.js",
     "ensure-dirs": "node scripts/ensure-directories.js",
     "count-lines": "node scripts/count-lines.js",
-    "stats": "node scripts/count-lines.js"
+    "stats": "node scripts/count-lines.js",
+    "release": "node scripts/release.js",
+    "release:patch": "node scripts/release.js patch",
+    "release:minor": "node scripts/release.js minor",
+    "release:major": "node scripts/release.js major"
   },
   "keywords": [
     "github",
