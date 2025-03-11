@@ -6,6 +6,26 @@
 
 A Node.js tool that converts a GitHub repository into a single file with built-in token counting. Compatible with Node.js 18+ and modern browsers.
 
+## Why Combine Repositories?
+
+In the age of AI and large language models (LLMs), understanding entire codebases is crucial. Repo-combiner addresses a critical challenge: **providing complete repository context to AI tools**.
+
+### Context Window Optimization
+
+Modern AI tools like ChatGPT, Claude, and GitHub Copilot have limited "context windows" - the amount of text they can process at once. Repo-combiner helps by:
+
+- **Consolidating entire repositories** into a single, well-structured file that fits within AI context windows
+- **Counting tokens** to determine if your codebase will fit in various AI tools' context limits
+- **Assessing AI-readiness** by telling you if your content is "Very small" (fits any chat window) to "Very large" (exceeds most limits)
+- **Stripping unnecessary files** (like node_modules, binary files, etc.) to maximize useful content
+
+### Practical AI Benefits
+
+- **Complete Context**: Ask AI about architecture and cross-file relationships without constant file switching
+- **Holistic Understanding**: Enable AI to reason about the entire codebase at once, not just isolated snippets
+- **Token Economy**: Optimize token usage by knowing exactly how large your codebase is in AI terms
+- **Efficient Fine-Tuning**: Create formatted training data from repositories for AI model fine-tuning
+
 ## AI/ML Applications
 
 Repo Combiner is especially valuable for machine learning and AI applications that need to process codebases:
