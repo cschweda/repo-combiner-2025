@@ -29,8 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Automated release scripts for streamlined npm publishing
-
 ### Changed
-- Updated README with automated npm publishing instructions
+- - docs: update CHANGELOG with recent changes
+- - docs: add automated npm publishing instructions to README
+- - feat: add automated release scripts
