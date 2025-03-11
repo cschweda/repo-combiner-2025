@@ -194,7 +194,7 @@ export async function runBrowserTests(options = {}) {
       // We expect an error due to timeout or abort
       runner.assert(error.message.includes('aborted') || error.message.includes('timeout') || 
                    error.message.includes('rate limit'), 
-        'Got expected error when testing with real repo');
+      'Got expected error when testing with real repo');
     }
   });
 
@@ -212,8 +212,8 @@ export async function runBrowserTests(options = {}) {
     
     // Test the error enhancement logic by creating a similar error to what would be thrown
     const enhancedError = new Error(
-      `GitHub API rate limit exceeded while fetching repo. ` +
-      `To increase your rate limit, authenticate with a GitHub token. ` +
+      'GitHub API rate limit exceeded while fetching repo. ' +
+      'To increase your rate limit, authenticate with a GitHub token. ' +
       `${mockError.message}`
     );
     enhancedError.isRateLimit = mockError.isRateLimit;
@@ -244,7 +244,7 @@ export async function runBrowserTests(options = {}) {
     
     runner.assert(withBasicAuth.config.auth.username === 'test-user' &&
                  withBasicAuth.config.auth.password === 'test-password', 
-      'Should properly set basic authentication');
+    'Should properly set basic authentication');
     
     // Test _hasAuth method
     runner.assert(withTokenAuth._hasAuth() === true, 'Should detect token auth');

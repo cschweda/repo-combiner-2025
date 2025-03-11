@@ -107,8 +107,20 @@ export default function App(options) {
       });
   }
 
+  function getFormattedDateTime() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+  }
+
   function downloadOutput() {
     const repoName = getRepoNameFromUrl(repoUrl);
+    const dateTime = getFormattedDateTime();
 
     let content = result;
     let filename;
@@ -116,13 +128,13 @@ export default function App(options) {
 
     if (format === 'json') {
       content = JSON.stringify(result, null, 2);
-      filename = `${repoName}.json`;
+      filename = `${repoName}_${dateTime}.json`;
       type = 'application/json';
     } else if (format === 'markdown') {
-      filename = `${repoName}.md`;
+      filename = `${repoName}_${dateTime}.md`;
       type = 'text/markdown';
     } else {
-      filename = `${repoName}.txt`;
+      filename = `${repoName}_${dateTime}.txt`;
       type = 'text/plain';
     }
 
