@@ -1,6 +1,6 @@
 {
-  "name": "@icjia/repo-combiner",
-  "version": "1.0.1",
+  "name": "repo-combiner",
+  "version": "1.0.2",
   "description": "Convert a GitHub repository into a single file",
   "main": "src/repo-combiner.js",
   "type": "module",
@@ -21,7 +21,7 @@
     "converter",
     "code"
   ],
-  "author": "Illinois Criminal Justice Information Authority",
+  "author": "cschweda",
   "license": "MIT",
   "dependencies": {
     "minimist": "^1.2.8",
@@ -37,12 +37,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ICJIA/repo-combiner-2025.git"
+    "url": "git+https://github.com/cschweda/repo-combiner-2025.git"
   },
   "bugs": {
-    "url": "https://github.com/ICJIA/repo-combiner-2025/issues"
+    "url": "https://github.com/cschweda/repo-combiner-2025/issues"
   },
-  "homepage": "https://github.com/ICJIA/repo-combiner-2025#readme",
+  "homepage": "https://github.com/cschweda/repo-combiner-2025#readme",
   "publishConfig": {
     "access": "public"
   },

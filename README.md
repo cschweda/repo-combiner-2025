@@ -1,8 +1,8 @@
-# @icjia/repo-combiner
+# repo-combiner
 
-[![npm version](https://img.shields.io/npm/v/@icjia/repo-combiner.svg)](https://www.npmjs.com/package/@icjia/repo-combiner)
+[![npm version](https://img.shields.io/npm/v/repo-combiner.svg)](https://www.npmjs.com/package/repo-combiner)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/node/v/@icjia/repo-combiner.svg)](https://nodejs.org/)
+[![Node.js Version](https://img.shields.io/node/v/repo-combiner.svg)](https://nodejs.org/)
 
 A Node.js tool that converts a GitHub repository into a single file. Compatible with Node.js 18+ and modern browsers.
 
@@ -25,7 +25,7 @@ To use Repo Combiner as a command-line tool, you can install it globally:
 
 ```bash
 # Global installation
-npm install -g @icjia/repo-combiner
+npm install -g repo-combiner
 
 # Verify installation
 repo-combiner --version
@@ -37,17 +37,17 @@ To use Repo Combiner in your project:
 
 ```bash
 # Add to your project
-npm install @icjia/repo-combiner
+npm install repo-combiner
 
 # Or with yarn
-yarn add @icjia/repo-combiner
+yarn add repo-combiner
 ```
 
 ### Manual Installation (for development)
 
 ```bash
 # Clone the repository
-git clone https://github.com/ICJIA/repo-combiner-2025.git
+git clone https://github.com/cschweda/repo-combiner-2025.git
 cd repo-combiner-2025
 
 # Install dependencies
@@ -157,7 +157,7 @@ You have a few options to import the module:
 ```html
 <script type="module">
   // Import directly from npm through a CDN like Skypack or UNPKG
-  import { createRepoCombiner } from 'https://cdn.skypack.dev/@icjia/repo-combiner';
+  import { createRepoCombiner } from 'https://cdn.skypack.dev/repo-combiner';
   
   // Your code here
 </script>
@@ -168,13 +168,13 @@ You have a few options to import the module:
 If you're using a bundler, install the package first:
 
 ```bash
-npm install @icjia/repo-combiner
+npm install repo-combiner
 ```
 
 Then import in your JavaScript file:
 
 ```javascript
-import { createRepoCombiner } from '@icjia/repo-combiner';
+import { createRepoCombiner } from 'repo-combiner';
 ```
 
 ### 3. Implement Repository Processing
@@ -266,7 +266,7 @@ When using Repo Combiner in a web application, you might encounter CORS (Cross-O
 ### Creating a Repo Combiner Instance
 
 ```javascript
-import { createRepoCombiner } from '@icjia/repo-combiner';
+import { createRepoCombiner } from 'repo-combiner';
 
 const repoCombiner = createRepoCombiner({
   // Configuration options
@@ -287,10 +287,10 @@ const repoCombiner = createRepoCombiner({
 
 ```javascript
 // Simple usage
-const output = await repoCombiner.processRepo('https://github.com/ICJIA/repo-combiner-2025');
+const output = await repoCombiner.processRepo('https://github.com/cschweda/repo-combiner-2025');
 
 // With additional options
-const output = await repoCombiner.processRepo('https://github.com/ICJIA/repo-combiner-2025', {
+const output = await repoCombiner.processRepo('https://github.com/cschweda/repo-combiner-2025', {
   format: 'json', // Override the format for this specific call
   maxFileSizeMB: 2 // Override the max file size for this call
 });
@@ -355,7 +355,7 @@ repo-combiner/
 
 ```bash
 # Clone the repository
-git clone https://github.com/ICJIA/repo-combiner-2025.git
+git clone https://github.com/cschweda/repo-combiner-2025.git
 cd repo-combiner-2025
 
 # Install dependencies

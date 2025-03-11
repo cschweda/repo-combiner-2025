@@ -158,7 +158,7 @@ async function cli() {
   }
 
   // Default repository URL for this project
-  const defaultRepoUrl = 'https://github.com/ICJIA/repo-combiner-2025';
+  const defaultRepoUrl = 'https://github.com/cschweda/repo-combiner-2025';
 
   // Check for repository URL from arguments
   let repoUrl = argv._[0];
