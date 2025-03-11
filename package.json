@@ -1,6 +1,6 @@
 {
   "name": "repo-combiner",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Convert a GitHub repository into a single file",
   "main": "src/repo-combiner.js",
   "type": "module",
