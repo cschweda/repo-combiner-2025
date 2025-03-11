@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Repo Combiner - Vite Example</title>
+  </head>
+  <body>
+    <header>
+      <h1>Repo Combiner</h1>
+      <p class="subtitle">Vite Implementation</p>
+      <div class="info-notice">
+        <strong>Using with Proxy Server:</strong> This example uses a local proxy server to avoid CORS issues.
+        <br><br>
+        <strong>To run this example:</strong>
+        <ol>
+          <li>Install dependencies: <code>npm install</code></li>
+          <li>Start both servers: <code>npm start</code></li>
+          <li>Proxy server will run on port 3010</li>
+        </ol>
+        <p>If you see connection errors, make sure the proxy server is running.</p>
+      </div>
+      <div class="log-toggle">
+        <button id="toggleLogButton" class="btn">Show Logs</button>
+      </div>
+    </header>
+    
+    <div class="form-container">
+      <div class="form-group">
+        <label for="repoUrl">GitHub Repository URL:</label>
+        <input type="text" id="repoUrl" placeholder="https://github.com/username/repository" value="https://github.com/cschweda/minimal-example">
+      </div>
+
+      <div class="form-group">
+        <label for="format">Output Format:</label>
+        <select id="format">
+          <option value="text">Text</option>
+          <option value="markdown" selected>Markdown</option>
+          <option value="json">JSON</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <details>
+          <summary>Authentication (for private repositories)</summary>
+          <div style="padding: 10px 0;">
+            <div class="form-group">
+              <label for="authType">Authentication Method:</label>
+              <select id="authType">
+                <option value="none" selected>None (Public Repository)</option>
+                <option value="token">Personal Access Token</option>
+                <option value="basic">Username & Password</option>
+              </select>
+            </div>
+            
+            <div id="tokenAuth" style="display: none;">
+              <div class="form-group">
+                <label for="githubToken">GitHub Personal Access Token:</label>
+                <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+              </div>
+            </div>
+            
+            <div id="basicAuth" style="display: none;">
+              <div class="form-group">
+                <label for="githubUsername">GitHub Username:</label>
+                <input type="text" id="githubUsername" placeholder="Your GitHub username">
+              </div>
+              <div class="form-group">
+                <label for="githubPassword">GitHub Password:</label>
+                <input type="password" id="githubPassword" placeholder="Your GitHub password">
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="form-group">
+        <button id="processButton">Process Repository</button>
+      </div>
+
+      <div class="progress">
+        <div class="progress-bar">
+          <div class="progress-bar-fill"></div>
+        </div>
+        <div class="status">Processing repository...</div>
+      </div>
+      
+      <div class="error"></div>
+    </div>
+    
+    <div class="loading">
+      <div class="spinner"></div>
+      <div>Processing repository...</div>
+    </div>
+
+    <div class="output-container">
+      <div class="output-header">
+        <h2>Repository Content</h2>
+        <div class="output-actions">
+          <button id="copyButton">Copy</button>
+          <button id="downloadButton">Download</button>
+        </div>
+      </div>
+      <div id="output"></div>
+    </div>
+
+    <!-- Log viewer container -->
+    <div id="log-viewer-container" style="display: none;">
+      <div id="log-viewer"></div>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

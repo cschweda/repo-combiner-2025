@@ -133,15 +133,15 @@ export const App = {
   methods: {
     getTokenAssessment(tokenCount) {
       if (tokenCount < 1000) {
-        return "Very small document, will fit easily in any chat window.";
+        return 'Very small document, will fit easily in any chat window.';
       } else if (tokenCount < 4000) {
-        return "Small document, should fit in most chat windows without issues.";
+        return 'Small document, should fit in most chat windows without issues.';
       } else if (tokenCount < 8000) {
-        return "Medium size document, may approach limits of some basic chat interfaces.";
+        return 'Medium size document, may approach limits of some basic chat interfaces.';
       } else if (tokenCount < 16000) {
-        return "Large document, likely exceeds capacity of basic chat interfaces.";
+        return 'Large document, likely exceeds capacity of basic chat interfaces.';
       } else {
-        return "Very large document, exceeds capacity of most chat interfaces.";
+        return 'Very large document, exceeds capacity of most chat interfaces.';
       }
     },
     

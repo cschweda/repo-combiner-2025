@@ -1,0 +1,282 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+    'Open Sans', 'Helvetica Neue', sans-serif;
+  line-height: 1.6;
+  color: #333;
+}
+
+body {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.subtitle {
+  color: #666;
+  margin-top: -10px;
+}
+
+.info-notice {
+  margin-top: 15px;
+  padding: 15px 20px;
+  background-color: #cce5ff;
+  border: 1px solid #b8daff;
+  border-radius: 4px;
+  color: #004085;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.info-notice ul, .info-notice ol {
+  margin-top: 5px;
+  margin-bottom: 10px;
+  padding-left: 25px;
+}
+
+.info-notice li {
+  margin-bottom: 5px;
+}
+
+.info-notice code {
+  background-color: rgba(0,0,0,0.1);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+h1 {
+  margin-bottom: 10px;
+}
+
+.form-container {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+input[type='text'],
+input[type='password'],
+select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: #0069d9;
+}
+
+.progress {
+  margin: 20px 0;
+  display: none;
+}
+
+.progress-bar {
+  height: 8px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: #007bff;
+  width: 0%;
+  transition: width 0.3s;
+}
+
+.status {
+  margin-top: 5px;
+  font-size: 14px;
+  color: #6c757d;
+}
+
+.output-container {
+  display: none;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.output-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.output-actions {
+  display: flex;
+  gap: 10px;
+}
+
+pre {
+  background-color: #f1f3f5;
+  padding: 15px;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.loading {
+  display: none;
+  text-align: center;
+  margin: 30px 0;
+}
+
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top: 4px solid #007bff;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 10px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error {
+  color: #dc3545;
+  padding: 15px;
+  border-radius: 4px;
+  margin-top: 15px;
+  margin-bottom: 15px;
+  display: none;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+}
+
+.error-box {
+  color: #721c24;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.error-details {
+  line-height: 1.5;
+}
+
+.error-details h3 {
+  margin-top: 0;
+  color: #721c24;
+}
+
+.error-details ul, 
+.error-details ol {
+  padding-left: 20px;
+  margin-bottom: 15px;
+}
+
+.error-details li {
+  margin-bottom: 5px;
+}
+
+.error-details a {
+  color: #0056b3;
+  text-decoration: underline;
+}
+
+.error-details a:hover {
+  text-decoration: none;
+}
+
+.token-assessment {
+  background-color: #e9f7ef;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  border-left: 4px solid #28a745;
+}
+
+.cors-warning {
+  background-color: #f8d7da;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border-left: 4px solid #dc3545;
+  color: #721c24;
+}
+
+/* Make the app responsive */
+/* Log viewer styling */
+#log-viewer-container {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.log-toggle {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.log-toggle button {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.log-toggle button:hover {
+  background-color: #5a6268;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  body {
+    padding: 15px;
+  }
+  
+  .output-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .output-actions {
+    margin-top: 10px;
+  }
+}

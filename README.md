@@ -383,6 +383,11 @@ You can run this example by:
 - **Basic Example**: `example/browser-example.html` - Simple usage demo
 - **Advanced Tests**: `example/browser-tests.html` - More advanced features
 - **Comprehensive Tests**: `example/comprehensive-browser-tests.html` - Full test suite
+- **Framework Implementations**:
+  - Vue.js: `example/vue/index.html` - Vue 3 implementation
+  - Svelte: `example/svelte/index.html` - Svelte implementation
+  - Vanilla JS: `example/vanilla/index.html` - No-framework implementation
+  - **Vite**: `example/vite-example/` - Modern build tool with hot reloading
 
 #### Platform-Specific Notes for Web Examples
 
@@ -405,13 +410,157 @@ You can run this example by:
   npx browser-sync start --server --files "example/**/*"
   ```
 
-### 5. Handling CORS in Web Usage
+### 5. Using with Modern Build Tools (Vite)
 
-When using Repo Combiner in a web application, you might encounter CORS (Cross-Origin Resource Sharing) issues when making requests to the GitHub API. To work around this:
+Repo Combiner works seamlessly with modern build tools like Vite. The project includes a complete Vite example that demonstrates how to integrate repo-combiner into a Vite application.
 
-- Use a CORS proxy for development
-- Deploy a server-side component that handles GitHub API requests
-- Use GitHub's CORS-enabled API endpoints where available
+#### Setting up a Vite Project with Repo Combiner
+
+1. **Create a new Vite project**:
+   ```bash
+   npm create vite@latest my-repo-combiner-app
+   cd my-repo-combiner-app
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install marked
+   ```
+
+3. **Create a browser-specific implementation**:
+   Since `repo-combiner` uses Node.js modules that aren't available in the browser, you need to use a browser-specific implementation:
+   
+   ```bash
+   # Copy the browser-repo-combiner.js file from the example directory
+   cp /path/to/repo-combiner-2025/example/vite-example/browser-repo-combiner.js ./
+   ```
+
+4. **Import and use in your Vite app**:
+   ```javascript
+   // main.js
+   import './style.css'
+   import { marked } from 'marked';
+   // Import the browser-specific implementation
+   import { createRepoCombiner } from './browser-repo-combiner';
+   
+   // Create repo combiner instance
+   const repoCombiner = createRepoCombiner({
+     format: 'markdown',
+     onProgress: (status) => {
+       console.log(status.message);
+     }
+   });
+   
+   // Process repository
+   repoCombiner.processRepo('https://github.com/expressjs/express')
+     .then(result => {
+       document.querySelector('#output').innerHTML = marked.parse(result);
+     });
+   ```
+
+4. **Running the Vite example with proxy server**:
+   ```bash
+   # Navigate to the Vite example
+   cd example/vite-example
+   
+   # Install dependencies
+   npm install
+   
+   # Start both the Vite dev server and proxy server
+   npm start
+   
+   # Or run them separately in different terminals:
+   npm run dev    # Start Vite dev server
+   npm run proxy  # Start proxy server
+   ```
+
+The Vite example includes:
+- Complete UI with progress reporting
+- Local proxy server to bypass CORS restrictions
+- Token assessment display showing if content will fit in AI chat windows
+- Multiple output formats (text, JSON, markdown)
+- Copy and download capabilities
+- Authentication options for private repositories
+
+### 6. Handling API Limits and CORS in Web Usage
+
+#### GitHub API Rate Limits
+
+When using Repo Combiner in a browser context, you may encounter GitHub API rate limits (60 requests per hour for unauthenticated requests). To increase this limit:
+
+1. **Use GitHub Authentication**: Provide a GitHub personal access token to increase your rate limit to 5,000 requests per hour:
+   ```javascript
+   const repoCombiner = createRepoCombiner({
+     auth: { token: 'your-github-token' }
+   });
+   ```
+
+2. **Optimize API Usage**: The browser implementation makes multiple GitHub API requests (repository info, directory listings, file contents).
+
+3. **Use Small Repositories**: For testing or demos, use smaller repositories with fewer files.
+
+4. **Display Helpful Error Messages**: When rate limits are hit, display helpful instructions to users about authentication:
+   ```javascript
+   try {
+     // Process repository
+   } catch (error) {
+     if (error.message.includes('API rate limit')) {
+       showHelpfulRateLimitMessage();
+     }
+   }
+   ```
+
+#### CORS Limitations
+
+Browser security restrictions (CORS) prevent direct requests to GitHub's raw content URLs from browser-based applications. There are several ways to handle this:
+
+1. **Implement a server-side proxy**: 
+   ```javascript
+   // Server-side proxy example (Express.js)
+   app.get('/proxy/github/:owner/:repo/:branch/*', async (req, res) => {
+     const { owner, repo, branch } = req.params;
+     const path = req.params[0];
+     const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+     
+     try {
+       const response = await fetch(url);
+       const content = await response.text();
+       res.send(content);
+     } catch (error) {
+       res.status(500).send(`Error fetching: ${error.message}`);
+     }
+   });
+   ```
+
+2. **Use GitHub's API instead of raw URLs**: The GitHub API's `contents` endpoint can be used with proper authentication and works around CORS issues.
+
+3. **Use a CORS proxy service**: For development and testing only (not for production):
+   ```javascript
+   // Example for development only - not for production
+   const corsProxyUrl = 'https://cors-anywhere.herokuapp.com/';
+   const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+   const proxiedUrl = corsProxyUrl + rawUrl;
+   
+   fetch(proxiedUrl).then(response => response.text());
+   ```
+
+4. **Use server-side rendering**: Process repositories server-side and deliver only the results to the browser.
+
+#### Browser-specific Implementation
+
+When using Repo Combiner in a browser environment, a specialized browser-specific implementation is required that avoids Node.js dependencies:
+
+```javascript
+// Import the browser-specific implementation
+import { createRepoCombiner } from './browser-repo-combiner';
+
+// Or adapt your code to handle both environments
+const repoCombiner = typeof window !== 'undefined' 
+  ? createBrowserRepoCombiner(options)
+  : createNodeRepoCombiner(options);
+```
+
+The Vite example in `example/vite-example` demonstrates a browser-specific implementation.
 
 ## API Reference
 
@@ -590,7 +739,17 @@ repo-combiner/
 ├── src/                # Source code
 │   └── repo-combiner.js # Main implementation
 ├── example/            # Examples
-│   └── browser-example.html # Browser usage example
+│   ├── browser-example.html # Browser usage example
+│   ├── vue/              # Vue.js implementation
+│   ├── svelte/           # Svelte implementation
+│   ├── vanilla/          # Vanilla JS implementation
+│   └── vite-example/     # Vite implementation with modern build tools
+│       ├── browser-repo-combiner.js # Browser-compatible implementation
+│       ├── index.html    # Vite example HTML
+│       ├── main.js       # Vite example JavaScript
+│       ├── style.css     # Vite example styles
+│       ├── package.json  # Vite project configuration
+│       └── vite.config.js # Vite build configuration
 ├── test/               # Tests
 ├── .env.example        # Example environment variables
 ├── package.json        # Package configuration
