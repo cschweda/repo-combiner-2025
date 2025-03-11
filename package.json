@@ -1,6 +1,6 @@
 {
   "name": "repo-combiner",
-  "version": "1.0.2",
+  "version": "1.0.1",
   "description": "Convert a GitHub repository into a single file",
   "main": "src/repo-combiner.js",
   "type": "module",
@@ -10,9 +10,10 @@
   "scripts": {
     "start": "node bin/cli.js",
     "test": "node test/index.js",
-    "lint": "eslint 'src/**/*.js' 'bin/**/*.js'",
-    "format": "prettier --write 'src/**/*.js' 'bin/**/*.js'",
-    "dev": "nodemon bin/cli.js"
+    "lint": "eslint 'src/**/*.js' 'bin/**/*.js' 'example/**/*.js'",
+    "format": "prettier --write 'src/**/*.js' 'bin/**/*.js' 'example/**/*.js'",
+    "dev": "nodemon bin/cli.js",
+    "changelog:update": "node scripts/update-changelog.js"
   },
   "keywords": [
     "github",
@@ -46,5 +47,13 @@
   "publishConfig": {
     "access": "public"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "example/",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

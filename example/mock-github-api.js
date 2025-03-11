@@ -1,6 +1,6 @@
 /**
  * Mock GitHub API for browser testing without making actual API requests
- * 
+ *
  * This is a simple implementation that intercepts fetch requests to github.com
  * and returns mock responses for testing various scenarios.
  */
@@ -26,7 +26,7 @@ export function initMockGitHubApi(options = {}) {
   };
 
   const settings = { ...defaultOptions, ...options };
-  
+
   if (!settings.enabled) {
     // Restore original fetch if mock is disabled
     window.fetch = originalFetch;
@@ -35,15 +35,15 @@ export function initMockGitHubApi(options = {}) {
   }
 
   // Override fetch
-  window.fetch = async function(url, options) {
+  window.fetch = async function (url, options) {
     // Only intercept GitHub API requests
     if (typeof url === 'string' && url.includes('api.github.com')) {
       console.log(`Mock GitHub API intercepted request to: ${url}`);
-      
+
       // Extract repo info from URL
       let owner, repo, path;
       try {
-        const match = url.match(/\/repos\/([^\/]+)\/([^\/]+)(?:\/contents\/(.*))?/);
+        const match = url.match(/\/repos\/([^/]+)\/([^/]+)(?:\/contents\/(.*))?/);
         if (match) {
           [, owner, repo, path] = match;
           path = path || '';
@@ -51,12 +51,12 @@ export function initMockGitHubApi(options = {}) {
       } catch (e) {
         console.error('Error parsing GitHub URL:', e);
       }
-      
+
       // Simulate network error
       if (settings.mockNetworkError) {
         throw new Error('Network error: Failed to fetch');
       }
-      
+
       // Create response headers
       const headers = new Headers({
         'content-type': 'application/json',
@@ -64,53 +64,54 @@ export function initMockGitHubApi(options = {}) {
         'x-ratelimit-remaining': settings.remainingRateLimit.toString(),
         'x-ratelimit-reset': settings.resetTime.toString(),
       });
-      
+
       // Simulate rate limit error
       if (settings.mockRateLimitError) {
         return new Response(
           JSON.stringify({
             message: 'API rate limit exceeded for your IP (60 requests per hour).',
-            documentation_url: 'https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting'
+            documentation_url:
+              'https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting',
           }),
-          { 
-            status: 403, 
+          {
+            status: 403,
             headers,
           }
         );
       }
-      
+
       // Simulate authentication error
       if (settings.mockAuthError) {
         return new Response(
           JSON.stringify({
             message: 'Bad credentials',
-            documentation_url: 'https://docs.github.com/rest'
+            documentation_url: 'https://docs.github.com/rest',
           }),
           { status: 401, headers }
         );
       }
-      
+
       // Simulate server error
       if (settings.mockServerError) {
         return new Response(
           JSON.stringify({
-            message: 'Server Error'
+            message: 'Server Error',
           }),
           { status: 500, headers }
         );
       }
-      
+
       // Simulate repo not found
       if (settings.mockRepoNotFound) {
         return new Response(
           JSON.stringify({
             message: 'Not Found',
-            documentation_url: 'https://docs.github.com/rest/reference/repos#get-a-repository'
+            documentation_url: 'https://docs.github.com/rest/reference/repos#get-a-repository',
           }),
           { status: 404, headers }
         );
       }
-      
+
       // Return successful response with mock data
       if (settings.mockSuccessfulRepo) {
         // Check if this is a repo info request or contents request
@@ -139,7 +140,7 @@ export function initMockGitHubApi(options = {}) {
                 git_url: `https://api.github.com/repos/${owner}/${repo}/git/trees/mock-sha-2`,
                 download_url: null,
                 type: 'dir',
-              }
+              },
             ]),
             { status: 200, headers }
           );
@@ -181,21 +182,21 @@ export function initMockGitHubApi(options = {}) {
           // Mock file content
           return new Response(
             'This is mock file content for testing.\n\nThe repo-combiner tool is working correctly!',
-            { 
-              status: 200, 
+            {
+              status: 200,
               headers: new Headers({
                 'content-type': 'text/plain',
-              }) 
+              }),
             }
           );
         }
       }
     }
-    
+
     // Pass through to original fetch for non-GitHub requests
     return originalFetch(url, options);
   };
-  
+
   console.log('Mock GitHub API initialized with settings:', settings);
 }
 

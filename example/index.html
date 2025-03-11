@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Repo Combiner Examples</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+          'Open Sans', 'Helvetica Neue', sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      h1 {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .implementations {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        justify-content: center;
+      }
+      .card {
+        width: 300px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+      .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      }
+      .card-header {
+        background-color: #007bff;
+        color: white;
+        padding: 15px;
+        text-align: center;
+        font-size: 1.2em;
+        font-weight: bold;
+      }
+      .card-body {
+        padding: 15px;
+      }
+      p {
+        margin-top: 0;
+      }
+      .btn {
+        display: inline-block;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        text-align: center;
+        margin-top: 10px;
+        transition: background-color 0.2s;
+      }
+      .btn:hover {
+        background-color: #0069d9;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Repo Combiner Web Examples</h1>
+
+    <div class="implementations">
+      <div class="card">
+        <div class="card-header">Vanilla JavaScript</div>
+        <div class="card-body">
+          <p>A pure JavaScript implementation with no frameworks or build steps.</p>
+          <a href="./vanilla/index.html" class="btn">View Example</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Vue 3</div>
+        <div class="card-body">
+          <p>An implementation using Vue 3 with the Options API pattern.</p>
+          <a href="./vue/index.html" class="btn">View Example</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Svelte 5</div>
+        <div class="card-body">
+          <p>An implementation using Svelte 5 with the latest features.</p>
+          <a href="./svelte/index.html" class="btn">View Example</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

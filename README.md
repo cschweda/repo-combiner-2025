@@ -120,31 +120,31 @@ First, create your HTML file with the necessary UI elements:
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Repo Combiner Web</title>
-  <style>
-    /* Add your styles here */
-  </style>
-</head>
-<body>
-  <h1>Repo Combiner Web Interface</h1>
-  
-  <div class="form">
-    <input type="text" id="repoUrl" placeholder="https://github.com/username/repository">
-    <select id="format">
-      <option value="text">Text</option>
-      <option value="markdown">Markdown</option>
-      <option value="json">JSON</option>
-    </select>
-    <button id="processButton">Process Repository</button>
-  </div>
-  
-  <div class="output" id="output"></div>
-  
-  <script type="module">
-    // Your JavaScript will go here
-  </script>
-</body>
+  <head>
+    <title>Repo Combiner Web</title>
+    <style>
+      /* Add your styles here */
+    </style>
+  </head>
+  <body>
+    <h1>Repo Combiner Web Interface</h1>
+
+    <div class="form">
+      <input type="text" id="repoUrl" placeholder="https://github.com/username/repository" />
+      <select id="format">
+        <option value="text">Text</option>
+        <option value="markdown">Markdown</option>
+        <option value="json">JSON</option>
+      </select>
+      <button id="processButton">Process Repository</button>
+    </div>
+
+    <div class="output" id="output"></div>
+
+    <script type="module">
+      // Your JavaScript will go here
+    </script>
+  </body>
 </html>
 ```
 
@@ -158,7 +158,7 @@ You have a few options to import the module:
 <script type="module">
   // Import directly from npm through a CDN like Skypack or UNPKG
   import { createRepoCombiner } from 'https://cdn.skypack.dev/repo-combiner';
-  
+
   // Your code here
 </script>
 ```
@@ -184,24 +184,24 @@ document.getElementById('processButton').addEventListener('click', async () => {
   const repoUrl = document.getElementById('repoUrl').value;
   const format = document.getElementById('format').value;
   const outputElement = document.getElementById('output');
-  
+
   if (!repoUrl) {
     outputElement.innerHTML = '<p class="error">Please enter a repository URL</p>';
     return;
   }
-  
+
   outputElement.innerHTML = '<p>Processing repository, please wait...</p>';
-  
+
   try {
     // Create the repo combiner instance
     const repoCombiner = createRepoCombiner({
       format: format,
-      onProgress: updateProgress // Optional progress callback
+      onProgress: updateProgress, // Optional progress callback
     });
-    
+
     // Process the repository
     const result = await repoCombiner.processRepo(repoUrl);
-    
+
     // Display the result
     if (format === 'markdown') {
       // If using markdown, you might want to render it
@@ -224,7 +224,7 @@ function updateProgress(progressData) {
   const progressElement = document.getElementById('progress');
   if (progressElement && progressData.message) {
     progressElement.textContent = progressData.message;
-    
+
     // If you have a progress bar
     if (progressData.progress !== undefined) {
       const progressBar = document.getElementById('progressBar');
@@ -247,6 +247,7 @@ example/browser-example.html
 You can run this example by:
 
 1. Serving the project directory with a local server
+
    ```bash
    npx serve
    ```
@@ -275,11 +276,11 @@ const repoCombiner = createRepoCombiner({
   skipFiles: ['.DS_Store'],
   maxFileSizeMB: 5,
   auth: {
-    token: 'your_github_personal_access_token'
+    token: 'your_github_personal_access_token',
   },
-  onProgress: (progressData) => {
+  onProgress: progressData => {
     console.log(`Progress: ${progressData.message}`);
-  }
+  },
 });
 ```
 
@@ -292,26 +293,26 @@ const output = await repoCombiner.processRepo('https://github.com/cschweda/repo-
 // With additional options
 const output = await repoCombiner.processRepo('https://github.com/cschweda/repo-combiner-2025', {
   format: 'json', // Override the format for this specific call
-  maxFileSizeMB: 2 // Override the max file size for this call
+  maxFileSizeMB: 2, // Override the max file size for this call
 });
 ```
 
 ### Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `format` | string | `'text'` | Output format: 'text', 'json', or 'markdown' |
-| `skipDirs` | array | `['node_modules', '.git', 'dist', 'build', 'coverage', '.github', '.vscode']` | Directories to skip |
-| `skipFiles` | array | `['.DS_Store', '.gitignore', 'package-lock.json', 'yarn.lock', '.eslintrc', '.prettierrc']` | Files to skip |
-| `skipExtensions` | array | `['.jpg', '.jpeg', '.png', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.mp3', '.mp4', '.zip', '.gz', '.exe', '.dll']` | File extensions to skip |
-| `tempDir` | string | `os.tmpdir() + '/repo-combiner'` | Temporary directory for cloned repositories |
-| `preserveStructure` | boolean | `true` | Preserve directory structure in output |
-| `maxFileSizeMB` | number | `10` | Maximum file size to process (in MB) |
-| `keepTemp` | boolean | `false` | Keep temporary files after processing |
-| `concurrency` | number | `5` | Number of concurrent file operations |
-| `timeout` | number | `300000` | Timeout for operations in milliseconds (5 minutes) |
-| `auth` | object | `{ token: process.env.GITHUB_TOKEN, username: process.env.GITHUB_USERNAME, password: process.env.GITHUB_PASSWORD }` | GitHub authentication details |
-| `onProgress` | function | `null` | Progress callback function |
+| Option              | Type     | Default                                                                                                                                       | Description                                        |
+| ------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `format`            | string   | `'text'`                                                                                                                                      | Output format: 'text', 'json', or 'markdown'       |
+| `skipDirs`          | array    | `['node_modules', '.git', 'dist', 'build', 'coverage', '.github', '.vscode']`                                                                 | Directories to skip                                |
+| `skipFiles`         | array    | `['.DS_Store', '.gitignore', 'package-lock.json', 'yarn.lock', '.eslintrc', '.prettierrc']`                                                   | Files to skip                                      |
+| `skipExtensions`    | array    | `['.jpg', '.jpeg', '.png', '.gif', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.mp3', '.mp4', '.zip', '.gz', '.exe', '.dll']` | File extensions to skip                            |
+| `tempDir`           | string   | `os.tmpdir() + '/repo-combiner'`                                                                                                              | Temporary directory for cloned repositories        |
+| `preserveStructure` | boolean  | `true`                                                                                                                                        | Preserve directory structure in output             |
+| `maxFileSizeMB`     | number   | `10`                                                                                                                                          | Maximum file size to process (in MB)               |
+| `keepTemp`          | boolean  | `false`                                                                                                                                       | Keep temporary files after processing              |
+| `concurrency`       | number   | `5`                                                                                                                                           | Number of concurrent file operations               |
+| `timeout`           | number   | `300000`                                                                                                                                      | Timeout for operations in milliseconds (5 minutes) |
+| `auth`              | object   | `{ token: process.env.GITHUB_TOKEN, username: process.env.GITHUB_USERNAME, password: process.env.GITHUB_PASSWORD }`                           | GitHub authentication details                      |
+| `onProgress`        | function | `null`                                                                                                                                        | Progress callback function                         |
 
 ### Event Callbacks
 
@@ -373,6 +374,38 @@ npm run format
 # Run tests
 npm test
 ```
+
+### Changelog Management
+
+This project uses [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format for the changelog. To update the changelog after pushing to GitHub:
+
+1. Run the following script to automatically update the changelog with commits since the last tag:
+
+```bash
+npm run changelog:update
+```
+
+2. Alternatively, you can use the manual approach:
+
+```bash
+# Get all commits since last tag
+git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"- %s" > changes.txt
+```
+
+3. Edit the CHANGELOG.md file, placing the commits in the appropriate sections (Added, Changed, Fixed, Removed).
+
+4. For a new release, add a new version section:
+
+```markdown
+## [1.0.0] - YYYY-MM-DD
+```
+
+#### Changelog Best Practices
+
+- Group changes by type (Added, Changed, Fixed, Removed)
+- Use present tense and imperative mood ("Add feature" not "Added feature")
+- Include issue/PR numbers when relevant: "Add new option (#123)"
+- Keep entries brief but descriptive
 
 ## License
 
