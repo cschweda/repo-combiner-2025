@@ -375,6 +375,87 @@ npm run format
 npm test
 ```
 
+## Publishing
+
+Follow these steps when publishing a new version to npm:
+
+### 1. Pre-publishing Checks
+
+Ensure your code is well-tested and ready for publishing:
+
+```bash
+# Run linting to check for code issues
+npm run lint
+
+# Format code to ensure consistent style
+npm run format
+
+# Run tests to make sure everything works
+npm test
+```
+
+### 2. Update Changelog
+
+Update the changelog with all changes since the last release:
+
+```bash
+# Automatically update CHANGELOG.md with commits since the last tag
+npm run changelog:update
+
+# Review and edit the generated entries in CHANGELOG.md
+```
+
+### 3. Version Bump
+
+Update the version number according to semantic versioning:
+
+```bash
+# For a patch release (bug fixes)
+npm version patch
+
+# For a minor release (new features, backwards compatible)
+npm version minor
+
+# For a major release (breaking changes)
+npm version major
+```
+
+### 4. Prepare and Test Package
+
+Check what will be included in the published package:
+
+```bash
+# Dry run to see what files will be published
+npm pack --dry-run
+
+# Create the package locally without publishing
+npm pack
+```
+
+### 5. Publish to npm
+
+Publish the package to npm:
+
+```bash
+# Publish to npm
+npm publish
+
+# For a beta release
+npm publish --tag beta
+```
+
+### 6. Post-publishing
+
+After publishing:
+
+```bash
+# Push the version commit and tags
+git push && git push --tags
+
+# Create a GitHub release (optional)
+# Go to https://github.com/cschweda/repo-combiner-2025/releases/new
+```
+
 ### Changelog Management
 
 This project uses [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format for the changelog. To update the changelog after pushing to GitHub:
