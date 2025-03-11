@@ -27,16 +27,16 @@ export async function runFrameworkTests(options = {}) {
 
   // Framework-specific tests
   switch (framework.toLowerCase()) {
-  case 'vue':
-    await runVueTests(runner, createRepoCombiner, options);
-    break;
-  case 'svelte':
-    await runSvelteTests(runner, createRepoCombiner, options);
-    break;
-  case 'vanilla':
-  default:
-    await runVanillaTests(runner, createRepoCombiner, options);
-    break;
+    case 'vue':
+      await runVueTests(runner, createRepoCombiner, options);
+      break;
+    case 'svelte':
+      await runSvelteTests(runner, createRepoCombiner, options);
+      break;
+    case 'vanilla':
+    default:
+      await runVanillaTests(runner, createRepoCombiner, options);
+      break;
   }
   
   // Add any additional tests from options

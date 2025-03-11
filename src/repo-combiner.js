@@ -841,15 +841,15 @@ Repository processing completed:
 
     try {
       switch (format.toLowerCase()) {
-      case 'json':
-        return this.generateJsonOutput();
-      case 'markdown':
-        return this.generateMarkdownOutput();
-      case 'text':
-        return this.generateTextOutput();
-      default:
-        console.warn(`Warning: Unsupported format '${format}', defaulting to 'text'`);
-        return this.generateTextOutput();
+        case 'json':
+          return this.generateJsonOutput();
+        case 'markdown':
+          return this.generateMarkdownOutput();
+        case 'text':
+          return this.generateTextOutput();
+        default:
+          console.warn(`Warning: Unsupported format '${format}', defaulting to 'text'`);
+          return this.generateTextOutput();
       }
     } catch (error) {
       console.error(`Error generating ${format} output:`, error.message);
