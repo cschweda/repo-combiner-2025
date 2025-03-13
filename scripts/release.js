@@ -2,12 +2,12 @@
 
 /**
  * Automated npm publication script for repo-combiner
- * Usage: 
+ * Usage:
  *   npm run publish [patch|minor|major]
  *   npm run publish:patch
  *   npm run publish:minor
  *   npm run publish:major
- * 
+ *
  * This script:
  * 1. Bumps the version (patch, minor, or major)
  * 2. Adds all changed files to git
@@ -17,7 +17,6 @@
  */
 
 import { execSync } from 'child_process';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import readline from 'readline';
@@ -79,7 +78,7 @@ function createPrompt() {
  */
 async function confirm(message) {
   const rl = createPrompt();
-  
+
   return new Promise(resolve => {
     rl.question(`${message} (y/N) `, answer => {
       rl.close();
@@ -96,48 +95,49 @@ async function release() {
     // 1. Display current status
     console.log('Current git status:');
     execCommand('git status');
-    
+
     // 2. Ask for confirmation
-    const shouldContinue = await confirm(`Ready to publish a ${versionType} version update. Continue?`);
+    const shouldContinue = await confirm(
+      `Ready to publish a ${versionType} version update. Continue?`
+    );
     if (!shouldContinue) {
       console.log('Publication cancelled');
       process.exit(0);
     }
-    
+
     // 3. Bump version
     console.log(`\n🔼 Bumping ${versionType} version...`);
     const newVersion = execCommandWithOutput(`npm version ${versionType} --no-git-tag-version`);
     console.log(`New version: ${newVersion}`);
-    
+
     // 4. Add all files to git
     console.log('\n📁 Adding all files to git...');
     execCommand('git add .');
-    
+
     // 5. Commit version changes
     console.log('\n💾 Committing changes...');
-    execCommand(`git commit -m "chore: release ${newVersion}"`);
-    
+    execCommand(`git commit -m 'chore: release ${newVersion}'`);
+
     // 6. Create tag
     console.log('\n🏷️ Creating git tag...');
     execCommand(`git tag ${newVersion}`);
-    
+
     // 7. Push changes and tags
     console.log('\n⬆️ Pushing to GitHub...');
     execCommand('git push');
     execCommand('git push --tags');
-    
+
     // 8. Always prompt for npm login
     console.log('\n🔑 Logging in to npm...');
     console.log('Please enter your npm credentials:');
     execCommand('npm login');
-    
+
     // 9. Publish to npm
     console.log('\n🚀 Publishing to npm...');
     execCommand('npm publish');
-    
+
     console.log(`\n🎉 Successfully released and published ${newVersion}!`);
-    console.log(`\nPackage is now available at: https://www.npmjs.com/package/repo-combiner`);
-    
+    console.log('\nPackage is now available at: https://www.npmjs.com/package/repo-combiner');
   } catch (error) {
     console.error('\n❌ Error during publication process:');
     console.error(error);

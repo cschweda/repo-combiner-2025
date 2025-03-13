@@ -6,108 +6,84 @@
 
 A Node.js tool that converts a GitHub repository into a single file with built-in token counting. Compatible with Node.js 18+ and modern browsers.
 
-## Why Combine Repositories?
+## Quick Start
 
-In the age of AI and large language models (LLMs), understanding entire codebases is crucial. Repo-combiner addresses a critical challenge: **providing complete repository context to AI tools**.
+```bash
+# Install globally
+npm install -g repo-combiner
 
-### Context Window Optimization
+# Process a repository (outputs to console)
+repo-combiner https://github.com/username/repository
 
-Modern AI tools like ChatGPT, Claude, and GitHub Copilot have limited "context windows" - the amount of text they can process at once. Repo-combiner helps by:
+# Save as markdown file
+repo-combiner --format markdown --output repo-content https://github.com/username/repository
+# Creates: repo-content_2023-08-15_14-32-45.md
+```
 
-- **Consolidating entire repositories** into a single, well-structured file that fits within AI context windows
-- **Counting tokens** to determine if your codebase will fit in various AI tools' context limits
-- **Assessing AI-readiness** by telling you if your content is "Very small" (fits any chat window) to "Very large" (exceeds most limits)
-- **Stripping unnecessary files** (like node_modules, binary files, etc.) to maximize useful content
+**What It Does:** Combines all files in a GitHub repo into a single document to provide complete context for AI tools and code analysis.
 
-### Practical AI Benefits
+**Key Features:**
 
-- **Complete Context**: Ask AI about architecture and cross-file relationships without constant file switching
-- **Holistic Understanding**: Enable AI to reason about the entire codebase at once, not just isolated snippets
-- **Token Economy**: Optimize token usage by knowing exactly how large your codebase is in AI terms
-- **Efficient Fine-Tuning**: Create formatted training data from repositories for AI model fine-tuning
+- Formats output as text, markdown, or JSON
+- Counts tokens to estimate AI model compatibility
+- Works in Node.js and browser environments
+- Preserves file structure and metadata
 
-## AI/ML Applications
+## Table of Contents
 
-Repo Combiner is especially valuable for machine learning and AI applications that need to process codebases:
+- [Why Use Repo Combiner](#why-use-repo-combiner)
+- [Installation](#installation)
+- [CLI Usage](#cli-usage)
+- [Web Usage](#web-usage)
+- [API Reference](#api-reference)
+- [Output Formats](#output-format-examples)
+- [Token Counting](#token-counting-and-ai-compatibility)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [Platform Support](#platform-support)
+- [License](#license)
 
-### LLM Context Windows
+## Why Use Repo Combiner
 
-- **Training Data Preparation**: Convert repositories into a single, well-formatted file for fine-tuning LLMs on code understanding tasks
-- **Context Window Optimization**: Entire codebases can be loaded within a single context window (with token count tracking)
-- **Code Analysis**: Query an AI about an entire codebase without having to cherry-pick individual files
+### Complete Context for AI Models
 
-### AI Agent Workflows
+Modern AI tools like ChatGPT, Claude, and GitHub Copilot have limited "context windows" - the amount of text they can process at once. Repo Combiner helps by:
 
-- **Repository Analysis**: Let an AI agent understand entire repos to generate thorough code reviews
-- **Automated Documentation**: Generate comprehensive documentation based on the entire codebase
-- **Architecture Visualization**: Ask an AI to analyze and visualize the architecture after processing the full repo
+- **Consolidating entire repositories** into a single, well-structured file
+- **Removing unnecessary files** (node_modules, binary files, etc.)
+- **Providing token metrics** to determine compatibility with various AI models
+- **Preserving file structure** to maintain relationships between code files
 
-### Practical Examples
+### Use Cases
 
-1. **Code Review Assistant**:
+#### Code Analysis
 
-   ```
-   repo-combiner https://github.com/user/project --format markdown
-   # Feed the output to an LLM with the prompt: "Review this codebase for security issues"
-   ```
+- Generate comprehensive code reviews with cross-file context
+- Identify architectural patterns and anti-patterns
+- Assess technical debt across the entire project
 
-2. **Migration Planning**:
+#### Documentation
 
-   ```
-   repo-combiner https://github.com/user/legacy-app --format json
-   # Ask an LLM: "Design a step-by-step migration plan from this AngularJS app to React"
-   ```
+- Create comprehensive documentation from full project context
+- Generate onboarding guides for new developers
+- Build architecture diagrams with full system understanding
 
-3. **Dependency Analysis**:
+#### Migration & Modernization
 
-   ```
-   repo-combiner https://github.com/user/project --format text
-   # Prompt an LLM: "Analyze the dependencies and suggest optimizations"
-   ```
+- Plan migrations between frameworks with complete context
+- Update legacy codebases to modern patterns
+- Refactor with full understanding of dependencies
 
-4. **Technical Documentation Generation**:
+#### AI Training & Research
 
-   ```
-   repo-combiner https://github.com/user/project --format markdown
-   # Instruct an LLM: "Generate comprehensive technical documentation for this codebase"
-   ```
-
-5. **Architecture Reasoning**:
-   ```
-   repo-combiner https://github.com/user/microservice-app --format json
-   # Ask an LLM: "Diagram the microservice architecture and suggest improvements"
-   ```
-
-### Token Counting Benefits
-
-The built-in token counting feature allows you to:
-
-- Estimate costs before sending to an LLM API
-- Ensure the content fits within your model's context window
-- Track usage metrics for large-scale processing
-
-## Features
-
-- Converts an entire GitHub repository into a single file
-- Works both as a command-line tool and as a browser-compatible module
-- Multiple output formats: text, JSON, or markdown
-- Includes detailed metadata for each file:
-  - Complete filenames with paths
-  - Direct links to files on GitHub
-  - File statistics (size, line count, creation/modification dates)
-- Skips unnecessary files and directories (node_modules, .git, etc.)
-- User-friendly interface
-- Support for large repositories
-- Error handling and progress reporting
-- Support for both private and public repositories
-- Token counting with AI-readiness assessment
-- Shows if content will fit in various chat model windows
+- Prepare training data for fine-tuning code models
+- Study architecture patterns across repositories
+- Create detailed educational content from real-world code
 
 ## Installation
 
 ### CLI Installation
-
-To use Repo Combiner as a command-line tool, you can install it globally:
 
 ```bash
 # Global installation
@@ -119,8 +95,6 @@ repo-combiner --version
 
 ### Project Installation
 
-To use Repo Combiner in your project:
-
 ```bash
 # Add to your project
 npm install repo-combiner
@@ -130,14 +104,6 @@ yarn add repo-combiner
 ```
 
 ### Manual Installation (for development)
-
-#### Prerequisites
-
-- Node.js 18 or higher
-- Git
-- npm or yarn
-
-#### Installation Steps (All Platforms)
 
 ```bash
 # Clone the repository
@@ -151,33 +117,7 @@ npm install
 npm link
 ```
 
-#### Platform-Specific Notes
-
-**Windows**:
-
-- If you encounter permission issues, run your terminal as administrator
-- Use PowerShell or Windows Terminal for best experience
-- Make sure Git is in your PATH
-
-**Linux**:
-
-- Depending on your distribution, you may need to use `sudo` for global installation:
-  ```bash
-  sudo npm install -g repo-combiner
-  ```
-- Ensure you have proper write permissions to your output directory
-
-**macOS**:
-
-- If you're using Homebrew to manage Node.js, you should not need `sudo` for global installation
-- You may need to use `sudo` if you installed Node.js differently:
-  ```bash
-  sudo npm install -g repo-combiner
-  ```
-
 ## CLI Usage
-
-The command-line interface provides a simple way to convert repositories to a single file.
 
 ### Basic Usage
 
@@ -191,25 +131,16 @@ repo-combiner --format markdown https://github.com/username/repository
 # Save output to a file (automatically adds datetime to filename)
 repo-combiner --output result https://github.com/username/repository
 # Creates: result_2023-08-15_14-32-45.md
-
-# Specify format and output file
-repo-combiner -f json -o output/repo-data https://github.com/username/repository
-# Creates: output/repo-data_2023-08-15_14-32-45.json
 ```
 
 ### Private Repository Access
-
-For private repositories, you can provide authentication:
 
 ```bash
 # Using a GitHub token (recommended)
 repo-combiner --token your_github_token https://github.com/username/private-repository
 
-# Using username and password
-repo-combiner --username your_username --password your_password https://github.com/username/private-repository
-
 # Using environment variables (.env file)
-# First create a .env file with GITHUB_TOKEN or GITHUB_USERNAME and GITHUB_PASSWORD
+# First create a .env file with GITHUB_TOKEN
 repo-combiner https://github.com/username/private-repository
 ```
 
@@ -417,64 +348,68 @@ Repo Combiner works seamlessly with modern build tools like Vite. The project in
 #### Setting up a Vite Project with Repo Combiner
 
 1. **Create a new Vite project**:
+
    ```bash
    npm create vite@latest my-repo-combiner-app
    cd my-repo-combiner-app
    ```
 
 2. **Install dependencies**:
+
    ```bash
    npm install marked
    ```
 
 3. **Create a browser-specific implementation**:
    Since `repo-combiner` uses Node.js modules that aren't available in the browser, you need to use a browser-specific implementation:
-   
+
    ```bash
    # Copy the browser-repo-combiner.js file from the example directory
    cp /path/to/repo-combiner-2025/example/vite-example/browser-repo-combiner.js ./
    ```
 
 4. **Import and use in your Vite app**:
+
    ```javascript
    // main.js
-   import './style.css'
+   import './style.css';
    import { marked } from 'marked';
    // Import the browser-specific implementation
    import { createRepoCombiner } from './browser-repo-combiner';
-   
+
    // Create repo combiner instance
    const repoCombiner = createRepoCombiner({
      format: 'markdown',
-     onProgress: (status) => {
+     onProgress: status => {
        console.log(status.message);
-     }
+     },
    });
-   
+
    // Process repository
-   repoCombiner.processRepo('https://github.com/expressjs/express')
-     .then(result => {
-       document.querySelector('#output').innerHTML = marked.parse(result);
-     });
+   repoCombiner.processRepo('https://github.com/expressjs/express').then(result => {
+     document.querySelector('#output').innerHTML = marked.parse(result);
+   });
    ```
 
-4. **Running the Vite example with proxy server**:
+5. **Running the Vite example with proxy server**:
+
    ```bash
    # Navigate to the Vite example
    cd example/vite-example
-   
+
    # Install dependencies
    npm install
-   
+
    # Start both the Vite dev server and proxy server
    npm start
-   
+
    # Or run them separately in different terminals:
    npm run dev    # Start Vite dev server
    npm run proxy  # Start proxy server
    ```
 
 The Vite example includes:
+
 - Complete UI with progress reporting
 - Local proxy server to bypass CORS restrictions
 - Token assessment display showing if content will fit in AI chat windows
@@ -489,9 +424,10 @@ The Vite example includes:
 When using Repo Combiner in a browser context, you may encounter GitHub API rate limits (60 requests per hour for unauthenticated requests). To increase this limit:
 
 1. **Use GitHub Authentication**: Provide a GitHub personal access token to increase your rate limit to 5,000 requests per hour:
+
    ```javascript
    const repoCombiner = createRepoCombiner({
-     auth: { token: 'your-github-token' }
+     auth: { token: 'your-github-token' },
    });
    ```
 
@@ -514,14 +450,15 @@ When using Repo Combiner in a browser context, you may encounter GitHub API rate
 
 Browser security restrictions (CORS) prevent direct requests to GitHub's raw content URLs from browser-based applications. There are several ways to handle this:
 
-1. **Implement a server-side proxy**: 
+1. **Implement a server-side proxy**:
+
    ```javascript
    // Server-side proxy example (Express.js)
    app.get('/proxy/github/:owner/:repo/:branch/*', async (req, res) => {
      const { owner, repo, branch } = req.params;
      const path = req.params[0];
      const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
-     
+
      try {
        const response = await fetch(url);
        const content = await response.text();
@@ -535,12 +472,13 @@ Browser security restrictions (CORS) prevent direct requests to GitHub's raw con
 2. **Use GitHub's API instead of raw URLs**: The GitHub API's `contents` endpoint can be used with proper authentication and works around CORS issues.
 
 3. **Use a CORS proxy service**: For development and testing only (not for production):
+
    ```javascript
    // Example for development only - not for production
    const corsProxyUrl = 'https://cors-anywhere.herokuapp.com/';
    const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
    const proxiedUrl = corsProxyUrl + rawUrl;
-   
+
    fetch(proxiedUrl).then(response => response.text());
    ```
 
@@ -555,9 +493,10 @@ When using Repo Combiner in a browser environment, a specialized browser-specifi
 import { createRepoCombiner } from './browser-repo-combiner';
 
 // Or adapt your code to handle both environments
-const repoCombiner = typeof window !== 'undefined' 
-  ? createBrowserRepoCombiner(options)
-  : createNodeRepoCombiner(options);
+const repoCombiner =
+  typeof window !== 'undefined'
+    ? createBrowserRepoCombiner(options)
+    : createNodeRepoCombiner(options);
 ```
 
 The Vite example in `example/vite-example` demonstrates a browser-specific implementation.
@@ -693,68 +632,19 @@ import React from 'react';
 }
 ```
 
-## Token Count Information
+## Filename Format
 
-At the end of each successful run, the tool will display:
-
-```
-✅ Repository processing complete!
-📊 Stats: 45 files processed (250KB)
-🔢 Total tokens: 52,480
-⏱️ Processing time: 1.2 seconds
-```
-
-This information helps you track usage metrics and understand the complexity of the repository.
-
-## Line Count Information
-
-At the end of each successful run, the tool will display detailed statistics including line counts:
+All saved files automatically include a datetime stamp in their filenames for better organization and to prevent overwriting previous outputs:
 
 ```
-✅ Repository processing complete!
-📊 Stats: 45 files processed (250KB)
-📝 Total lines: 3,245
-🔢 Total tokens: 52,480
-⏱️ Processing time: 1.2 seconds
+[base-filename]_[YYYY-MM-DD]_[HH-MM-SS].[extension]
 ```
 
-This information helps you track usage metrics and understand the complexity of the repository.
+Examples:
 
-You can also run the line counting tool separately on your codebase:
-
-```bash
-npm run count-lines
-```
-
-This will generate a report of all files in your project with their line counts, and save a markdown summary to `code-stats.md`.
-
-## Project Structure
-
-The project follows the standard Node.js package structure:
-
-```
-repo-combiner/
-├── bin/                # Command-line interface
-│   └── cli.js          # CLI entry point
-├── src/                # Source code
-│   └── repo-combiner.js # Main implementation
-├── example/            # Examples
-│   ├── browser-example.html # Browser usage example
-│   ├── vue/              # Vue.js implementation
-│   ├── svelte/           # Svelte implementation
-│   ├── vanilla/          # Vanilla JS implementation
-│   └── vite-example/     # Vite implementation with modern build tools
-│       ├── browser-repo-combiner.js # Browser-compatible implementation
-│       ├── index.html    # Vite example HTML
-│       ├── main.js       # Vite example JavaScript
-│       ├── style.css     # Vite example styles
-│       ├── package.json  # Vite project configuration
-│       └── vite.config.js # Vite build configuration
-├── test/               # Tests
-├── .env.example        # Example environment variables
-├── package.json        # Package configuration
-└── README.md           # Documentation
-```
+- `react-app_2023-08-15_14-32-45.md`
+- `tensorflow_2023-08-16_09-15-22.json`
+- `express-server_2023-08-17_18-05-37.txt`
 
 ## Development
 
@@ -774,284 +664,27 @@ npm run lint
 
 # Format the code
 npm run format
-
-# Run tests
-npm test
 ```
 
-## Publishing
+## Testing
 
-### Automated Publishing
-
-This package includes a streamlined release process using the automated release script:
+The project includes several test suites:
 
 ```bash
-# Login to npm first
-npm login
+# Run all tests
+npm run test:all
 
-# For a patch release (bug fixes)
-npm run release
-
-# For a minor release (new features, backwards compatible)
-npm run release:minor
-
-# For a major release (breaking changes)
-npm run release:major
+# Run specific test suites
+npm run test:node        # Run Node.js environment tests
+npm run test:browser     # Instructions for browser-based tests
+npm run test:cli         # Test CLI functionality
+npm run test:filename    # Test filename formatting
+npm run test:integration # Run integration tests
+npm run test:simplified  # Run simplified test suite
 ```
 
-The automated release script will:
-1. Run linting and tests to ensure code quality
-2. Update the changelog with recent commits
-3. Bump the version according to semantic versioning
-4. Create a git tag for the new version
-5. Push changes and tags to GitHub
-6. Publish the package to npm
-
-### Quick Publication Script
-
-For a streamlined publication process, you can use the dedicated npm publication script:
-
-```bash
-# For a patch update (1.0.0 -> 1.0.1)
-npm run publish-npm:patch
-
-# For a minor update (1.0.0 -> 1.1.0)
-npm run publish-npm:minor
-
-# For a major update (1.0.0 -> 2.0.0)
-npm run publish-npm:major
-```
-
-This script performs the following steps:
-1. Bumps the version (patch, minor, or major)
-2. Adds all changed files to git
-3. Commits and pushes to GitHub with the new version
-4. Performs npm login 
-5. Publishes to npm
-
-### Manual Publishing Steps
-
-If you prefer to publish manually, follow these steps:
-
-### 1. Pre-publishing Checks
-
-Ensure your code is well-tested and ready for publishing:
-
-```bash
-# Run linting to check for code issues
-npm run lint
-
-# Format code to ensure consistent style
-npm run format
-
-# Run tests to make sure everything works
-npm test
-```
-
-### 2. Update Changelog
-
-Update the changelog with all changes since the last release:
-
-```bash
-# Automatically update CHANGELOG.md with commits since the last tag
-npm run changelog:update
-
-# Review and edit the generated entries in CHANGELOG.md
-```
-
-### 3. Version Bump
-
-Update the version number according to semantic versioning:
-
-```bash
-# For a patch release (bug fixes)
-npm version patch
-
-# For a minor release (new features, backwards compatible)
-npm version minor
-
-# For a major release (breaking changes)
-npm version major
-```
-
-### 4. Prepare and Test Package
-
-Check what will be included in the published package:
-
-```bash
-# Dry run to see what files will be published
-npm pack --dry-run
-
-# Create the package locally without publishing
-npm pack
-```
-
-### 5. Publish to npm
-
-Publish the package to npm:
-
-```bash
-# Publish to npm
-npm publish
-
-# For a beta release
-npm publish --tag beta
-```
-
-### 6. Post-publishing
-
-After publishing:
-
-```bash
-# Push the version commit and tags
-git push && git push --tags
-
-# Create a GitHub release (optional)
-# Go to https://github.com/cschweda/repo-combiner-2025/releases/new
-```
-
-### Changelog Management
-
-This project uses [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format for the changelog. To update the changelog after pushing to GitHub:
-
-1. Run the following script to automatically update the changelog with commits since the last tag:
-
-```bash
-npm run changelog:update
-```
-
-2. Alternatively, you can use the manual approach:
-
-```bash
-# Get all commits since last tag
-git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"- %s" > changes.txt
-```
-
-3. Edit the CHANGELOG.md file, placing the commits in the appropriate sections (Added, Changed, Fixed, Removed).
-
-4. For a new release, add a new version section:
-
-```markdown
-## [1.0.0] - YYYY-MM-DD
-```
-
-#### Changelog Best Practices
-
-- Group changes by type (Added, Changed, Fixed, Removed)
-- Use present tense and imperative mood ("Add feature" not "Added feature")
-- Include issue/PR numbers when relevant: "Add new option (#123)"
-- Keep entries brief but descriptive
+For browser tests, open `example/comprehensive-browser-tests.html` in your web browser.
 
 ## License
 
 MIT
-
-# Advanced AI/ML Applications with Repo Combiner
-
-## Why Repository Analysis Matters for AI/ML
-
-### Enhanced LLM Training and Fine-tuning
-
-- **Code Understanding**: Training LLMs to understand complete codebases rather than fragmented files improves their ability to reason about complex software structures
-- **Cross-file Reasoning**: Models can understand relationships between different files (imports, dependencies, inheritance) when seeing the whole repository
-- **Code Generation**: Models trained on complete repositories develop better understanding of project structure and architecture
-- **Token Efficiency**: Knowing token counts helps optimize context window usage for maximum information density
-
-### AI-Driven Development Use Cases
-
-#### Code Analysis and Improvement
-
-- **Automated Code Reviews**: Feed an entire codebase to get comprehensive reviews that understand cross-file relationships
-
-  ```bash
-  repo-combiner https://github.com/user/project --format markdown > project.md
-  # Prompt: "Review this codebase for performance bottlenecks, security issues, and best practice violations"
-  ```
-
-- **Technical Debt Assessment**: Identify and prioritize technical debt across the entire project
-
-  ```bash
-  repo-combiner https://github.com/user/legacy-project --format json > project.json
-  # Prompt: "Analyze this codebase for technical debt and provide a prioritized refactoring plan"
-  ```
-
-- **Pattern Recognition**: Detect architectural patterns and anti-patterns across the codebase
-  ```bash
-  repo-combiner https://github.com/user/application --format text > application.txt
-  # Prompt: "Identify the architectural patterns used in this application and suggest improvements"
-  ```
-
-#### Documentation and Knowledge Transfer
-
-- **Automated Documentation Generation**: Create comprehensive documentation that understands full project context
-
-  ```bash
-  repo-combiner https://github.com/user/project --format markdown > project.md
-  # Prompt: "Generate detailed user and developer documentation for this project"
-  ```
-
-- **Onboarding Material Creation**: Generate onboarding guides for new developers
-  ```bash
-  repo-combiner https://github.com/user/project --format markdown > project.md
-  # Prompt: "Create an onboarding guide for new developers joining this project"
-  ```
-
-#### Migration and Modernization
-
-- **Framework Migration Planning**: Generate detailed migration plans between frameworks
-
-  ```bash
-  repo-combiner https://github.com/user/legacy-app --format json > app.json
-  # Prompt: "Create a step-by-step plan to migrate this Angular.js application to React"
-  ```
-
-- **Code Modernization**: Update codebases to use modern patterns and APIs
-  ```bash
-  repo-combiner https://github.com/user/legacy-code --format text > legacy.txt
-  # Prompt: "Suggest updates to modernize this codebase, focusing on deprecated APIs and outdated patterns"
-  ```
-
-### Advanced Integration Techniques
-
-- **AI Agents with Repository Knowledge**: Create agents that understand entire codebases to assist with development tasks
-- **Automated PR Reviews**: Feed repository content to LLMs to auto-review pull requests with full project context
-- **Custom Plugin Development**: Build IDE plugins that leverage LLMs with repository context for intelligent code completion
-- **Continuous Code Quality**: Integrate with CI/CD pipelines for ongoing code quality analysis
-
-### Research and Education
-
-- **Architecture Analysis**: Study and compare architecture patterns across many repositories
-- **Educational Content Generation**: Create tutorials and learning materials from real-world codebases
-- **Code Synthesis Research**: Build better models for generating code by training on full repositories
-
-## Token Counting for Resource Optimization
-
-The built-in token counter helps you:
-
-- **Predict API Costs**: Calculate approximate API costs before sending to paid LLM APIs
-- **Optimize Context Windows**: Split large repositories intelligently to fit within context limits
-- **Track Processing Metrics**: Monitor token usage across projects for budgeting and resource allocation
-
-At the end of each run, you'll see useful token metrics:
-
-```
-Repository processing completed:
-- Total files processed: 152
-- Total size: 1.25 MB
-- Total tokens: 157,489
-- Processing time: 3.54 seconds
-```
-
-## Filename Format
-
-All saved files automatically include a datetime stamp in their filenames for better organization and to prevent overwriting previous outputs:
-
-```
-[base-filename]_[YYYY-MM-DD]_[HH-MM-SS].[extension]
-```
-
-Examples:
-
-- `react-app_2023-08-15_14-32-45.md`
-- `tensorflow_2023-08-16_09-15-22.json`
-- `express-server_2023-08-17_18-05-37.txt`
